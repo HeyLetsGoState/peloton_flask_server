@@ -13,7 +13,8 @@ conn = PelotonConnection()
 
 # Enable Cross-origin resource sharing since we have port 8080 for the UI and 5000 here
 # Unless of course you choose to run templates and run it all out of here
-CORS(app, resources={r'/*': {'origins': '*'}})
+CORS(app, resources={r'/*': {'origins': '*',   'allowedHeaders': ['Content-Type']}})
+app.config['CORS_HEADERS'] = 'Content-Type'
 
 client = boto3.client('dynamodb')
 eastern = timezone('US/Eastern')
