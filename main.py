@@ -1,16 +1,15 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from datetime import datetime
-from datetime import timezone
-
 from pytz import timezone
-
-import pytz
 import datetime
 import boto3
+import json
+from connection.peloton_connection import PelotonConnection
 
 app = Flask(__name__)
 app.config.from_object(__name__)
+conn = PelotonConnection()
 
 # Enable Cross-origin resource sharing since we have port 8080 for the UI and 5000 here
 # Unless of course you choose to run templates and run it all out of here
@@ -18,6 +17,7 @@ CORS(app, resources={r'/*': {'origins': '*'}})
 
 client = boto3.client('dynamodb')
 eastern = timezone('US/Eastern')
+
 
 """
 Just a health-check to make sure we're properly deployed
@@ -93,9 +93,32 @@ def get_charts():
     datasets = [average_output, average_cadence, average_resistance, average_speed, miles_per_ride]
     return jsonify(datasets)
 
+@app.route("/login", methods=['POST'])
+def login_user():
+    creds = request.get_json()
+    data = {
+        "username_or_email": f"{creds.get('email')}",
+        "password": f"{creds.get('passwd')}"
+    }
+
+
+    auth_response = conn.post("https://api.onepeloton.com/auth/login", json.dumps(data))
+    session_id = auth_response.get("session_id")
+    user_id = auth_response.get("user_id")
+    cookies = dict(peloton_session_id=session_id)
+
+    return {
+        'user_id': user_id,
+        'cookies': cookies
+    }
+
 
 @app.route("/get_user_rollup", methods=['GET'])
 def get_user_rollup():
+    credentials = request.get_json()
+    cookies = json.loads(request.args.get('cookies'))
+    user_id = request.args.get('user_id')
+
     items = client.scan(
         TableName="peloton_ride_data"
     )
@@ -105,10 +128,14 @@ def get_user_rollup():
 
     miles_ridden = sum([float(r.get('Avg Cadence').get('M').get('miles_ridden').get('N')) for r in averages])
     total_achievements = averages[-1].get('total_achievements').get('N')
+    user_info = conn.get_user_info(user_id, cookies)
 
     return jsonify({
-        'total_miles' : miles_ridden,
-        'total_achievements': total_achievements
+        'total_miles':miles_ridden,
+        'total_rides': user_info.get('total_pedaling_metric_workouts'),
+        'total_achievements': total_achievements,
+        'photo_url': user_info.get('image_url'),
+        'name': f"{user_info.get('first_name')} {user_info.get('last_name')}"
     })
 
 

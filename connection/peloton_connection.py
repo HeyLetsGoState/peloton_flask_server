@@ -33,14 +33,19 @@ class PelotonConnection:
         workout_ids = [workout_id.get("id") for workout_id in my_workouts]
         return workout_ids
 
+    @staticmethod
+    def __get_user__(self, user_id, cookies):
+        my_url = f"https://api.onepeloton.com/api/me"
+        my_info = self.get(my_url, cookies)
+        return my_info
     '''
     If you've never run this before, you can just remove the [0] and make this a for loop
     and iterate over each one
     '''
     def get_most_recent_ride_details(self, user_id=None, cookies=None, save=False):
         # Get the most recent workout ID
-        workout_ids = PelotonConnection.__get_workouts__(self, user_id, cookies)
-        for workout_id in workout_ids:
+        workout_ids = PelotonConnection.__get_workouts__(self, user_id, cookies)[0]
+        for workout_id in [workout_ids]:
             workout_url = f"https://api.onepeloton.com/api/workout/{workout_id}"
             # Get the workout info
             workout = self.get(workout_url, cookies)
@@ -101,14 +106,17 @@ class PelotonConnection:
 
         # This is just a sanity check coming back from Dynamo
 
+    def get_user_info(self, user_id=None, cookies=None):
+        user_info = PelotonConnection.__get_user__(self, user_id, cookies)
+        return user_info
 
     '''
     Similar to the get_most_recent_ride this will go and grab the most recent record
     Flip it out to a loop if you want to grab it all
     '''
     def get_most_recent_ride_info(self, user_id=None, cookies=None, save=False):
-        workout_ids = PelotonConnection.__get_workouts__(self, user_id, cookies)
-        for workout_id in workout_ids:
+        workout_ids = PelotonConnection.__get_workouts__(self, user_id, cookies)[0]
+        for workout_id in [workout_ids]:
             workout_url = f"https://api.onepeloton.com/api/workout/{workout_id}"
             workout = self.get(workout_url, cookies)
             created_at = workout.get("created_at")

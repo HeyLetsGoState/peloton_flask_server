@@ -14,5 +14,5 @@ user_id = auth_response.get("user_id")
 cookies = dict(peloton_session_id=session_id)
 
 # Run this daily or set-up a cron to do it for you
-conn.get_most_recent_ride_details(user_id, cookies, False)
-conn.get_most_recent_ride_info(user_id, cookies, False)
+conn.get_most_recent_ride_details(user_id, cookies, True)
+conn.get_most_recent_ride_info(user_id, cookies, True)
