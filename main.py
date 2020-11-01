@@ -1,7 +1,11 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
+from datetime import datetime
+from datetime import timezone
+
 from pytz import timezone
 
+import pytz
 import datetime
 import boto3
 
@@ -123,11 +127,12 @@ def get_music_by_time(ride_time=None):
         TableName="peloton_music_sets"
     )
 
-    # If I'm doing two unique courses on my ID at the same time (then we've entered a parallel universe)
     # TODO - Get a utility class to dump these S's and L's' and the rest from Dynamo
-    music = [i for i in items.get("Items") if i.get('created_at').get('S') == ride_time][0]
-    music_set = [song.get('S') for song in music.get('set_list').get('L')]
+    music = [i for i in items.get("Items") if i.get('created_at').get('S') == ride_time]
+    if music is not None:
+        music_set = [song.get('S') for song in music[0].get('set_list').get('L')]
     return jsonify(music_set)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
