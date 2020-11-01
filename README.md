@@ -8,3 +8,8 @@ peloton information.
 
 Front-End Data can be populated with these rest calls and information can be 
 display via ChartJS 
+
+
+If you think this has helped you on your journey, I'd love a cup of coffee
+
+<a href="https://www.buymeacoffee.com/psukardi"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=psukardi&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff"></a>
