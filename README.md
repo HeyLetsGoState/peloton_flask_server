@@ -8,3 +8,6 @@ peloton information.
 
 Front-End Data can be populated with these rest calls and information can be 
 display via ChartJS 
+
+
+<a href="https://www.buymeacoffee.com/psukardi" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a>
