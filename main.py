@@ -94,6 +94,24 @@ def get_charts():
     return jsonify(datasets)
 
 
+@app.route("/get_user_rollup", methods=['GET'])
+def get_user_rollup():
+    items = client.scan(
+        TableName="peloton_ride_data"
+    )
+
+    averages = items.get("Items")
+    averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
+
+    miles_ridden = sum([float(r.get('Avg Cadence').get('M').get('miles_ridden').get('N')) for r in averages])
+    total_achievements = averages[-1].get('total_achievements').get('N')
+
+    return jsonify({
+        'total_miles' : miles_ridden,
+        'total_achievements': total_achievements
+    })
+
+
 """
 Pull back course data information to display in a table
 """
