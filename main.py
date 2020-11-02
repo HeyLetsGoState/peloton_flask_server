@@ -1,23 +1,47 @@
-from flask import Flask, jsonify, request
+import boto3
+import datetime
+import flask_login
+import hashlib
+import json
+import random
 from flask_cors import CORS
 from datetime import datetime
 from pytz import timezone
-import datetime
-import boto3
-import json
 from connection.peloton_connection import PelotonConnection
+from flask import Flask, jsonify, request, Response, session, abort, url_for, redirect, g
+from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
 
 app = Flask(__name__)
 app.config.from_object(__name__)
+app.config.update(SECRET_KEY="1234567")
 conn = PelotonConnection()
 
-# Enable Cross-origin resource sharing since we have port 8080 for the UI and 5000 here
-# Unless of course you choose to run templates and run it all out of here
-CORS(app, resources={r'/*': {'origins': '*',   'allowedHeaders': ['Content-Type']}})
+# CORS Set-up here and at the bottom
+CORS(app, resources={r'/*': {'origins': '*', 'allowedHeaders': ['Content-Type']}})
 app.config['CORS_HEADERS'] = 'Content-Type'
-
 client = boto3.client('dynamodb')
 eastern = timezone('US/Eastern')
+
+
+# flask-login
+login_manager = LoginManager()
+login_manager.init_app(app)
+# Force the user to goto /login if they're not logged in
+login_manager.login_view = "login"
+
+'''
+Create my User Model
+'''
+
+
+class User(UserMixin):
+    def __init__(self, id):
+        self.id = id
+        self.name = "user" + id
+        self.passwd = self.name + "_secret"
+
+    def __repr__(self):
+        return "%d/%s/%s/%s" % (self.id, self.name, self.password)
 
 
 """
@@ -26,6 +50,7 @@ Just a health-check to make sure we're properly deployed
 
 
 @app.route("/ping", methods=['GET'])
+@login_required
 def ping():
     return jsonify('pong!')
 
@@ -39,6 +64,14 @@ This gets us our labels for the x-axis going from oldest to newest
 
 @app.route("/get_labels", methods=['GET'])
 def get_labels():
+    # I'll  use this as my model for forcing logins in the future
+    # current_user = flask_login.current_user.id
+    #
+    # if current_user == 'guest':
+    #     random_data = list(range(50,85))
+    #     random.shuffle(random_data)
+    #     return jsonify(random_data)
+
     items = client.scan(
         TableName="peloton_ride_data"
     )
@@ -94,14 +127,14 @@ def get_charts():
     datasets = [average_output, average_cadence, average_resistance, average_speed, miles_per_ride]
     return jsonify(datasets)
 
-@app.route("/login", methods=['POST'])
-def login_user():
+
+@app.route("/peloton_login", methods=['POST'])
+def peloton_login():
     creds = request.get_json()
     data = {
         "username_or_email": f"{creds.get('email')}",
         "password": f"{creds.get('passwd')}"
     }
-
 
     auth_response = conn.post("https://api.onepeloton.com/auth/login", json.dumps(data))
     session_id = auth_response.get("session_id")
@@ -132,7 +165,7 @@ def get_user_rollup():
     user_info = conn.get_user_info(user_id, cookies)
 
     return jsonify({
-        'total_miles':miles_ridden,
+        'total_miles': miles_ridden,
         'total_rides': user_info.get('total_pedaling_metric_workouts'),
         'total_achievements': total_achievements,
         'photo_url': user_info.get('image_url'),
@@ -167,6 +200,7 @@ def get_course_data():
 
     return jsonify(return_data)
 
+
 @app.route("/music_by_time/<ride_time>")
 def get_music_by_time(ride_time=None):
     items = client.scan(
@@ -178,6 +212,72 @@ def get_music_by_time(ride_time=None):
     if music is not None:
         music_set = [song.get('S') for song in music[0].get('set_list').get('L')]
     return jsonify(music_set)
+
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'http://pelodashboard.com')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
+
+
+# somewhere to login
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        psw = request.form['password']
+
+        if username == "guest" and psw == "guest":
+            user = User('guest')
+            login_user(user)
+            return redirect("http://pelodashboard.com")
+
+        items = client.scan(
+            TableName="users"
+        )
+
+        user = [u for u in items.get('Items') if u.get('user_id').get('S') == username][0]
+        password = user.get('password').get('S')
+
+        hashed_psw = hashlib.md5(psw.encode()).hexdigest()
+
+        if password == hashed_psw:
+            user = User(username, canView=True)
+            login_user(user)
+            return redirect("http://pelodashboard.com")
+        else:
+            return abort(401)
+    else:
+        return Response('''
+        <form action="" method="post">
+            <p><input type=text name=username>
+            <p><input type=password name=password>
+            <p><input type=submit value=Login>
+        </form>
+        ''')
+
+
+# somewhere to logout
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return Response('<p>Logged out</p>')
+
+
+# handle login failed
+@app.errorhandler(401)
+def page_not_found(e):
+    return Response('<p>Login failed</p>')
+
+
+# callback to reload the user object
+@login_manager.user_loader
+def load_user(userid):
+    return User(userid)
 
 
 if __name__ == "__main__":
