@@ -1,3 +1,6 @@
+import hashlib
+from hashlib import sha1
+
 import requests
 import time
 import json
@@ -44,8 +47,8 @@ class PelotonConnection:
     '''
     def get_most_recent_ride_details(self, user_id=None, cookies=None, save=False):
         # Get the most recent workout ID
-        workout_ids = PelotonConnection.__get_workouts__(self, user_id, cookies)[0]
-        for workout_id in [workout_ids]:
+        workout_ids = PelotonConnection.__get_workouts__(self, user_id, cookies)
+        for workout_id in workout_ids:
             workout_url = f"https://api.onepeloton.com/api/workout/{workout_id}"
             # Get the workout info
             workout = self.get(workout_url, cookies)
@@ -78,9 +81,27 @@ class PelotonConnection:
                     'heart_rate': heart_rate[0].get("average_value") if heart_rate is not None else None,
                     'total_achievements': total_achievements,
                     'miles_ridden': [f for f in performance_res.get("summaries") if f.get("display_name") == "Distance"][
-                        0].get("value")
+                        0].get("value"),
+                    'user_id': user_id
                 }
                 results[average.get('display_name')] = result
+
+            """
+            Now that more than one user wants to use this thing, we need to make each record super unique
+            So we'll take the created at and the workout id and make that the hash.
+            We'll combine the time of the ride, the id of the ride and the id of the bike
+            """
+            d = {
+                'created_at': created_at,
+                'workout_id': workout.get('id'),
+                'bike_id': workout.get('peloton_id')
+            }
+
+            dhash = hashlib.md5()
+            encoded = json.dumps(d, sort_keys=True).encode()
+            dhash.update(encoded)
+            workout_hash = dhash.hexdigest()
+
 
             # At some point it would behove me to purge the dynamo db and move the dupes out of results
             # But for now, we will leave it.  Also, account for no heart rate monitor
@@ -93,7 +114,10 @@ class PelotonConnection:
                 'total_achievements': total_achievements,
                 'miles_ridden': [f for f in performance_res.get("summaries") if f.get("display_name") == "Distance"][
                     0].get("value"),
-                "ride_Id": str(created_at)
+                "created_at": str(created_at),
+                "ride_Id": str(created_at),
+                'workout_hash': str(workout_hash),
+                'user_id': workout.get('peloton_id')
              }
 
             table = boto3.resource('dynamodb').Table('peloton_ride_data')
@@ -115,8 +139,8 @@ class PelotonConnection:
     Flip it out to a loop if you want to grab it all
     '''
     def get_most_recent_ride_info(self, user_id=None, cookies=None, save=False):
-        workout_ids = PelotonConnection.__get_workouts__(self, user_id, cookies)[0]
-        for workout_id in [workout_ids]:
+        workout_ids = PelotonConnection.__get_workouts__(self, user_id, cookies)
+        for workout_id in workout_ids:
             workout_url = f"https://api.onepeloton.com/api/workout/{workout_id}"
             workout = self.get(workout_url, cookies)
             created_at = workout.get("created_at")
@@ -131,6 +155,17 @@ class PelotonConnection:
             except Exception:
                 instructor = None
 
+            d = {
+                'created_at': created_at,
+                'workout_id': workout.get('id'),
+                'bike_id': workout.get('peloton_id')
+            }
+
+            dhash = hashlib.md5()
+            encoded = json.dumps(d, sort_keys=True).encode()
+            dhash.update(encoded)
+            workout_hash = dhash.hexdigest()
+
             if instructor is not None:
                 table = boto3.resource('dynamodb').Table('peloton_course_data')
                 if save is True:
@@ -140,7 +175,9 @@ class PelotonConnection:
                             "difficulty": str(ride_id_details.get('ride').get('difficulty_rating_avg')),
                             "instructor": instructor,
                             "length": str(time.strftime("%H:%M:%S", time.gmtime(ride_id_details.get('ride').get('duration')))),
-                            "name": ride_id_details.get('ride').get('title')
+                            "name": ride_id_details.get('ride').get('title'),
+                            "workout_hash": str(workout_hash),
+                            'user_id': user_id
                         }
                     )
 
@@ -154,7 +191,9 @@ class PelotonConnection:
                     table.put_item(
                         Item={
                             "created_at": str(created_at),
-                            "set_list": set_list
+                            "set_list": set_list,
+                            'user_id': user_id,
+                            "workout_hash": str(workout_hash),
                         }
                     )
 
