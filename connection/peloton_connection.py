@@ -117,7 +117,7 @@ class PelotonConnection:
                 "created_at": str(created_at),
                 "ride_Id": str(created_at),
                 'workout_hash': str(workout_hash),
-                'user_id': workout.get('peloton_id')
+                'user_id': user_id
              }
 
             table = boto3.resource('dynamodb').Table('peloton_ride_data')
