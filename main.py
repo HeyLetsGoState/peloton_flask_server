@@ -86,22 +86,17 @@ def pull_user_data():
     return resp
 
 
-@app.route("/get_labels", methods=['GET'])
-def get_labels():
+@app.route("/get_labels/", methods=['GET'])
+@app.route('/get_labels/<user_id>', methods=['GET'])
+def get_labels(user_id=None):
     items = client.scan(
         TableName="peloton_ride_data"
     )
 
-    creds = request.get_json()
-    user_id = creds.get('user_id', None) if creds is not None else None
-
     averages = items.get("Items")
-    print(f"The user ID is {user_id}", file=sys.stderr)
 
-    if user_id is not None:
-        ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == user_id]
-    else:
-        ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == default_user_id]
+    user_id = user_id if user_id is not None else default_user_id
+    ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == user_id]
     ride_times = [datetime.fromtimestamp(int(r.get('S')), tz=eastern).strftime('%Y-%m-%d') for r in ride_times]
     # Why doesn't sort return anything
     ride_times.sort()
@@ -113,16 +108,18 @@ Felt that grabbing the heart-rate info on it's own return was useful for the one
 """
 
 
-@app.route("/get_heart_rate", methods=['GET'])
-def get_heart_rate():
+@app.route("/get_heart_rate/", methods=['GET'])
+@app.route('/get_heart_rate/<user_id>', methods=['GET'])
+def get_heart_rate(user_id=None):
     items = client.scan(
         TableName="peloton_ride_data"
     )
 
+    user_id = user_id if user_id is not None else default_user_id
     # Grab my data
     data = items.get("Items")
     # Then sort it
-    data = [d for d in data if d.get('user_id').get('S') == default_user_id]
+    data = [d for d in data if d.get('user_id').get('S') == user_id]
     data = sorted(data, key=lambda i: i['ride_Id'].get('S'))
 
     heart_rate = [f.get('Avg Output').get('M').get('heart_rate').get('N') for f in data]
@@ -135,20 +132,17 @@ Generate the chart data for the average outputs of Output/Cadence/Resistance/Spe
 """
 
 
-@app.route("/get_charts", methods=['GET'])
-def get_charts():
+@app.route("/get_charts/", methods=['GET'])
+@app.route('/get_charts/<user_id>', methods=['GET'])
+def get_charts(user_id=None):
     items = client.scan(
         TableName="peloton_ride_data"
     )
 
     averages = items.get("Items")
+    user_id = user_id if user_id is not None else default_user_id
     # Trim this down to just ME
-    creds = request.get_json()
-    user_id = creds.get('user_id', None) if creds is not None else None
-    if user_id is not None:
-        averages = [a for a in averages if a.get('user_id').get('S') == user_id]
-    else:
-        averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
+    averages = [a for a in averages if a.get('user_id').get('S') == user_id]
 
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
     average_output = [f.get("Avg Output").get('M').get("value").get('N') for f in averages]
@@ -190,11 +184,10 @@ def get_user_rollup():
         TableName="peloton_ride_data"
     )
 
+    user_id = user_id if not None or '' else default_user_id
+
     averages = items.get("Items")
-    if user_id is not None:
-        averages = [a for a in averages if a.get('user_id').get('S') == user_id]
-    else:
-        averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
+    averages = [a for a in averages if a.get('user_id').get('S') == user_id]
 
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
     miles_ridden = sum([float(r.get('Avg Cadence').get('M').get('miles_ridden').get('N')) for r in averages])
@@ -215,21 +208,17 @@ Pull back course data information to display in a table
 """
 
 
-@app.route("/course_data")
-def get_course_data():
+@app.route("/course_data/")
+@app.route('/course_data/<user_id>', methods=['GET'])
+def get_course_data(user_id=None):
     items = client.scan(
         TableName="peloton_course_data"
     )
     return_data = {}
     course_data = items.get("Items")
+    user_id = user_id if user_id is not None else default_user_id
 
-    creds = request.get_json()
-    user_id = creds.get('user_id', None) if creds is not None else None
-
-    if user_id is not None:
-        course_data = [c for c in course_data if c.get('user_id').get('S') == user_id]
-    else:
-        course_data = [c for c in course_data if c.get('user_id').get('S') == default_user_id]
+    course_data = [c for c in course_data if c.get('user_id').get('S') == user_id]
 
     course_data = sorted(course_data, key=lambda i: i['created_at'].get('S'))
 
