@@ -78,15 +78,13 @@ def pull_user_data():
     resp = jsonify(success=True)
     return resp
 
-@app.route("/get_labels")
-def get_labels():
+@app.route("/get_labels/<user_id>")
+def get_labels(user_id=None):
 
     items = client.scan(
         TableName="peloton_ride_data"
     )
     averages = items.get("Items")
-
-    user_id = json.loads(request.args.get('user_id'))
     peloton_id = user_id if user_id is not None else default_user_id
 
     ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == peloton_id]
@@ -101,8 +99,8 @@ Felt that grabbing the heart-rate info on it's own return was useful for the one
 """
 
 
-@app.route("/get_heart_rate", methods=['GET'])
-def get_heart_rate():
+@app.route("/get_heart_rate/<user_id>", methods=['GET'])
+def get_heart_rate(user_id=None):
     items = client.scan(
         TableName="peloton_ride_data"
     )
@@ -111,7 +109,6 @@ def get_heart_rate():
     data = items.get("Items")
     # Then sort it
 
-    user_id = json.loads(request.args.get('user_id'))
     peloton_id = user_id if user_id is not None else default_user_id
 
     data = [d for d in data if d.get('user_id').get('S') == peloton_id]
@@ -127,8 +124,8 @@ Generate the chart data for the average outputs of Output/Cadence/Resistance/Spe
 """
 
 
-@app.route("/get_charts", methods=['GET'])
-def get_charts():
+@app.route("/get_charts/<user_id>", methods=['GET'])
+def get_charts(user_id=None):
     items = client.scan(
         TableName="peloton_ride_data"
     )
@@ -136,7 +133,6 @@ def get_charts():
     averages = items.get("Items")
     # Trim this down to just ME
 
-    user_id = json.loads(request.args.get('user_id'))
     peloton_id = user_id if user_id is not None else default_user_id
 
     averages = [a for a in averages if a.get('user_id').get('S') == peloton_id]
@@ -206,14 +202,12 @@ Pull back course data information to display in a table
 """
 
 
-@app.route("/course_data")
-def get_course_data():
+@app.route("/course_data/<user_id>")
+def get_course_data(user_id=None):
     items = client.scan(
         TableName="peloton_course_data"
     )
     return_data = {}
-
-    user_id = json.loads(request.args.get('user_id'))
     peloton_id = user_id if user_id is not None else default_user_id
 
     course_data = items.get("Items")
