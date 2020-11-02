@@ -252,6 +252,11 @@ def get_music_by_time(ride_time=None):
 # somewhere to login
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # force the user to re-login and clear their cookies
+    logout_user()
+    session.clear()
+    session.modified = True
+
     if request.method == 'POST':
         username = request.form['username']
         psw = request.form['password']
