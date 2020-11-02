@@ -271,7 +271,7 @@ def login():
         session['COOKIES'] = cookies
 
         response = make_response(redirect("http://pelodashboard.com"))
-        response.set_cookie('USER_ID', session['USER_ID'])
+        response.set_cookie('USER_ID', user_id)
         return response
     else:
         return Response('''

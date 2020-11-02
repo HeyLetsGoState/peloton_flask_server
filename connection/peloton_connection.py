@@ -69,22 +69,26 @@ class PelotonConnection:
             # So just loop over and grab out the data
             # There are some dupes like heart_rate/achievements_etc but wasn't sure where to put it
             averages = performance_res.get("average_summaries")
+            heart_rate = {}
             for average in averages:
-                heart_rate = [f for f in performance_res.get("metrics")
-                              if f.get("display_name") == "Heart Rate"] or None
-                result = {
-                    'name': average.get('display_name'),
-                    'unit': average.get('display_unit'),
-                    'value': average.get('value'),
-                    'distance': [f for f in performance_res.get("summaries")
-                                 if f.get("display_name") == 'Distance'][0].get("value"),
-                    'heart_rate': heart_rate[0].get("average_value") if heart_rate is not None else None,
-                    'total_achievements': total_achievements,
-                    'miles_ridden': [f for f in performance_res.get("summaries") if f.get("display_name") == "Distance"][
-                        0].get("value"),
-                    'user_id': user_id
-                }
-                results[average.get('display_name')] = result
+                try:
+                    heart_rate = [f for f in performance_res.get("metrics")
+                                  if f.get("display_name") == "Heart Rate"] or None
+                    result = {
+                        'name': average.get('display_name'),
+                        'unit': average.get('display_unit'),
+                        'value': average.get('value'),
+                        'distance': [f for f in performance_res.get("summaries")
+                                     if f.get("display_name") == 'Distance'][0].get("value"),
+                        'heart_rate': heart_rate[0].get("average_value") if heart_rate is not None else None,
+                        'total_achievements': total_achievements,
+                        'miles_ridden': [f for f in performance_res.get("summaries") if f.get("display_name") == "Distance"][
+                            0].get("value"),
+                        'user_id': user_id
+                    }
+                    results[average.get('display_name')] = result
+                except:
+                    print("Drop it to the floor")
 
             """
             Now that more than one user wants to use this thing, we need to make each record super unique
@@ -196,4 +200,5 @@ class PelotonConnection:
                             "workout_hash": str(workout_hash),
                         }
                     )
+
 
