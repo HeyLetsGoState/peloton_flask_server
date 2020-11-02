@@ -76,7 +76,10 @@ def pull_user_data():
     conn.get_most_recent_ride_info(user_id, cookies, True)
 
     resp = jsonify(success=True)
-    return resp
+    response = make_response(redirect("http://pelodashboard.com"))
+    response.set_cookie('USER_ID', session['USER_ID'])
+    return response
+
 
 @app.route("/get_labels/<user_id>")
 def get_labels(user_id=None):
