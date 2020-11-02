@@ -1,14 +1,12 @@
 import boto3
 import flask_login
-import hashlib
 import json
-import random
 from jproperties import Properties
 from flask_cors import CORS
 from datetime import datetime
 from pytz import timezone
 from connection.peloton_connection import PelotonConnection
-from flask import Flask, jsonify, request, Response, session, abort, url_for, redirect, g
+from flask import Flask, jsonify, request, Response, session, redirect
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
 
 app = Flask(__name__)
@@ -207,7 +205,6 @@ def get_course_data():
         TableName="peloton_course_data"
     )
     return_data = {}
-
     course_data = items.get("Items")
     if session.get('USER_ID') is not None:
         course_data = [c for c in course_data if c.get('user_id').get('S') == session['USER_ID']]
@@ -250,7 +247,7 @@ def login():
         psw = request.form['password']
 
         user = User(username)
-        login_user(user)
+        login_user(user, remember=True)
         current_user = load_user(flask_login.current_user.id)
 
         data = {
@@ -291,7 +288,7 @@ def login():
 @login_required
 def logout():
     logout_user()
-    return Response('<p>Logged out</p>')
+    return redirect('http://pelodashboard.com/')
 
 
 # handle login failed
