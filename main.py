@@ -64,8 +64,7 @@ This gets us our labels for the x-axis going from oldest to newest
 """
 
 
-@app.route("/get_labels/", methods=['GET'])
-@app.route("/get_labels/<user_id>", methods=['GET'])
+@app.route("/get_labels", methods=['GET'])
 def get_labels(user_id=None):
     # I'll  use this as my model for forcing logins in the future
     # current_user = flask_login.current_user.id
@@ -93,8 +92,7 @@ Felt that grabbing the heart-rate info on it's own return was useful for the one
 """
 
 
-@app.route("/get_heart_rate/", methods=['GET'])
-@app.route("/get_heart_rate/<user_id>", methods=['GET'])
+@app.route("/get_heart_rate", methods=['GET'])
 def get_heart_rate(user_id=None):
     items = client.scan(
         TableName="peloton_ride_data"
@@ -117,8 +115,7 @@ Generate the chart data for the average outputs of Output/Cadence/Resistance/Spe
 """
 
 
-@app.route("/get_charts/", methods=['GET'])
-@app.route("/get_charts/<user_id>", methods=['GET'])
+@app.route("/get_charts", methods=['GET'])
 def get_charts(user_id=None):
     items = client.scan(
         TableName="peloton_ride_data"
@@ -190,8 +187,7 @@ Pull back course data information to display in a table
 """
 
 
-@app.route("/course_data/")
-@app.route("/course_data/<user_id>")
+@app.route("/course_data")
 def get_course_data(user_id=None):
     items = client.scan(
         TableName="peloton_course_data"
