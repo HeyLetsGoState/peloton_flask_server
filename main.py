@@ -275,6 +275,9 @@ def login():
 
     else:
         return Response('''
+        <h3>Peloton Login</h3>
+        <p>Please enter your credentials to pull the analytic data.  No credentials will be stored and
+        will simply be passed through to the provider for authorization</p>
         <form action="" method="post">
             <p><input type=text name=username>
             <p><input type=password name=password>
