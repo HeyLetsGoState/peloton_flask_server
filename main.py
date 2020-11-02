@@ -91,11 +91,15 @@ def get_labels():
     items = client.scan(
         TableName="peloton_ride_data"
     )
-    averages = items.get("Items")
-    print(f"The user ID is {session.get('USER_ID')}", file=sys.stderr)
 
-    if session.get('USER_ID') is not None:
-        ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == session.get('USER_ID')]
+    creds = request.get_json()
+    user_id = creds.get('user_id', None) if creds is not None else None
+
+    averages = items.get("Items")
+    print(f"The user ID is {user_id}", file=sys.stderr)
+
+    if user_id is not None:
+        ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == user_id]
     else:
         ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == default_user_id]
     ride_times = [datetime.fromtimestamp(int(r.get('S')), tz=eastern).strftime('%Y-%m-%d') for r in ride_times]
@@ -139,8 +143,10 @@ def get_charts():
 
     averages = items.get("Items")
     # Trim this down to just ME
-    if session.get('USER_ID') is not None:
-        averages = [a for a in averages if a.get('user_id').get('S') == session.get('USER_ID')]
+    creds = request.get_json()
+    user_id = creds.get('user_id', None) if creds is not None else None
+    if user_id is not None:
+        averages = [a for a in averages if a.get('user_id').get('S') == user_id]
     else:
         averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
 
@@ -185,8 +191,8 @@ def get_user_rollup():
     )
 
     averages = items.get("Items")
-    if session.get('USER_ID') is not None:
-        averages = [a for a in averages if a.get('user_id').get('S') == session.get('USER_ID')]
+    if user_id is not None:
+        averages = [a for a in averages if a.get('user_id').get('S') == user_id]
     else:
         averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
 
@@ -216,8 +222,12 @@ def get_course_data():
     )
     return_data = {}
     course_data = items.get("Items")
-    if session.get('USER_ID') is not None:
-        course_data = [c for c in course_data if c.get('user_id').get('S') == session.get('USER_ID')]
+
+    creds = request.get_json()
+    user_id = creds.get('user_id', None) if creds is not None else None
+
+    if user_id is not None:
+        course_data = [c for c in course_data if c.get('user_id').get('S') == user_id]
     else:
         course_data = [c for c in course_data if c.get('user_id').get('S') == default_user_id]
 
