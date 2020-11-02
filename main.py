@@ -86,7 +86,7 @@ def get_labels():
     )
     averages = items.get("Items")
 
-    if session['USER_ID'] is not None:
+    if session.get('USER_ID') is not None:
         ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == session['USER_ID']]
     else:
         ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == default_user_id]
@@ -131,7 +131,7 @@ def get_charts():
 
     averages = items.get("Items")
     # Trim this down to just ME
-    if session['USER_ID'] is not None:
+    if session.get('USER_ID') is not None:
         averages = [a for a in averages if a.get('user_id').get('S') == session['USER_ID']]
     else:
         averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
@@ -177,7 +177,7 @@ def get_user_rollup():
     )
 
     averages = items.get("Items")
-    if session['USER_ID'] is not None:
+    if session.get('USER_ID') is not None:
         averages = [a for a in averages if a.get('user_id').get('S') == session['USER_ID']]
     else:
         averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
@@ -209,7 +209,7 @@ def get_course_data():
     return_data = {}
 
     course_data = items.get("Items")
-    if session['USER_ID'] is not None:
+    if session.get('USER_ID') is not None:
         course_data = [c for c in course_data if c.get('user_id').get('S') == session['USER_ID']]
     else:
         course_data = [c for c in course_data if c.get('user_id').get('S') == default_user_id]
