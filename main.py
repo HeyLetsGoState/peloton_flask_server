@@ -1,14 +1,11 @@
 import boto3
-import flask_login
-import hashlib
 import json
-import random
-from jproperties import Properties
 from flask_cors import CORS
 from datetime import datetime
+from jproperties import Properties
 from pytz import timezone
 from connection.peloton_connection import PelotonConnection
-from flask import Flask, jsonify, request, Response, session, abort, url_for, redirect, g
+from flask import Flask, jsonify, request, Response, session, redirect, make_response
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
 
 app = Flask(__name__)
@@ -25,12 +22,8 @@ eastern = timezone('US/Eastern')
 # flask-login
 login_manager = LoginManager()
 login_manager.init_app(app)
+# Force the user to goto /login if they're not logged in
 login_manager.login_view = "login"
-
-
-'''
-Create my User Model
-'''
 
 p = Properties()
 with open("peloton.properties", "rb") as f:
@@ -38,10 +31,15 @@ with open("peloton.properties", "rb") as f:
 
 default_user_id = p["USER_ID"].data
 
+'''
+Create my User Model
+'''
+
+
 class User(UserMixin):
     def __init__(self, id):
         self.id = id
-        self.name = id
+        self.name = "user" + id
         self.passwd = self.name + "_secret"
 
     def __repr__(self):
@@ -65,31 +63,25 @@ so yank that out, parse it to a date-time and then sort it and then return it
 This gets us our labels for the x-axis going from oldest to newest
 """
 
-@app.route("/pull_user_data", methods=['GET'])
-@login_required
-def pull_user_data():
 
-    # Run this daily or set-up a cron to do it for you
-    user_id = session['USER_ID']
-    cookies = session['COOKIES']
-    conn.get_most_recent_ride_details(user_id, cookies, True)
-    conn.get_most_recent_ride_info(user_id, cookies, True)
-
-    resp = jsonify(success=True)
-    return resp
-
-@app.route("/get_labels", methods=['GET'])
-def get_labels():
+@app.route("/get_labels/", methods=['GET'])
+@app.route("get_labels/<user_id>", methods=['GET'])
+def get_labels(user_id=None):
+    # I'll  use this as my model for forcing logins in the future
+    # current_user = flask_login.current_user.id
+    #
+    # if current_user == 'guest':
+    #     random_data = list(range(50,85))
+    #     random.shuffle(random_data)
+    #     return jsonify(random_data)
 
     items = client.scan(
         TableName="peloton_ride_data"
     )
     averages = items.get("Items")
 
-    if session.get('USER_ID') is not None:
-        ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == session['USER_ID']]
-    else:
-        ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == default_user_id]
+    user_id = user_id if user_id is not None else default_user_id
+    ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == user_id]
     ride_times = [datetime.fromtimestamp(int(r.get('S')), tz=eastern).strftime('%Y-%m-%d') for r in ride_times]
     # Why doesn't sort return anything
     ride_times.sort()
@@ -101,16 +93,18 @@ Felt that grabbing the heart-rate info on it's own return was useful for the one
 """
 
 
-@app.route("/get_heart_rate", methods=['GET'])
-def get_heart_rate():
+@app.route("/get_heart_rate/", methods=['GET'])
+@app.route("/get_heart_rate/<user_id>", methods=['GET'])
+def get_heart_rate(user_id=None):
     items = client.scan(
         TableName="peloton_ride_data"
     )
 
+    user_id = user_id if user_id is not None else default_user_id
     # Grab my data
     data = items.get("Items")
     # Then sort it
-    data = [d for d in data if d.get('user_id').get('S') == default_user_id]
+    data = [d for d in data if d.get('user_id').get('S') == user_id]
     data = sorted(data, key=lambda i: i['ride_Id'].get('S'))
 
     heart_rate = [f.get('Avg Output').get('M').get('heart_rate').get('N') for f in data]
@@ -123,19 +117,18 @@ Generate the chart data for the average outputs of Output/Cadence/Resistance/Spe
 """
 
 
-@app.route("/get_charts", methods=['GET'])
-def get_charts():
+@app.route("/get_charts/", methods=['GET'])
+@app.route("/get_charts/<user_id>", methods=['GET'])
+def get_charts(user_id=None):
     items = client.scan(
         TableName="peloton_ride_data"
     )
 
     averages = items.get("Items")
-    # Trim this down to just ME
-    if session.get('USER_ID') is not None:
-        averages = [a for a in averages if a.get('user_id').get('S') == session['USER_ID']]
-    else:
-        averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
 
+    user_id = user_id if user_id is not None else default_user_id
+    # Trim this down to just ME
+    averages = [a for a in averages if a.get('user_id').get('S') == user_id]
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
     average_output = [f.get("Avg Output").get('M').get("value").get('N') for f in averages]
     average_cadence = [f.get("Avg Cadence").get('M').get("value").get('N') for f in averages]
@@ -177,12 +170,8 @@ def get_user_rollup():
     )
 
     averages = items.get("Items")
-    if session.get('USER_ID') is not None:
-        averages = [a for a in averages if a.get('user_id').get('S') == session['USER_ID']]
-    else:
-        averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
-
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
+
     miles_ridden = sum([float(r.get('Avg Cadence').get('M').get('miles_ridden').get('N')) for r in averages])
     total_achievements = averages[-1].get('total_achievements').get('N')
     user_info = conn.get_user_info(user_id, cookies)
@@ -201,19 +190,18 @@ Pull back course data information to display in a table
 """
 
 
-@app.route("/course_data")
-def get_course_data():
+@app.route("/course_data/")
+@app.route("/course_data/<user_id>")
+def get_course_data(user_id=None):
     items = client.scan(
         TableName="peloton_course_data"
     )
     return_data = {}
 
     course_data = items.get("Items")
-    if session.get('USER_ID') is not None:
-        course_data = [c for c in course_data if c.get('user_id').get('S') == session['USER_ID']]
-    else:
-        course_data = [c for c in course_data if c.get('user_id').get('S') == default_user_id]
 
+    user_id = user_id if user_id is not None else default_user_id
+    course_data = [c for c in course_data if c.get('user_id').get('S') == user_id]
     course_data = sorted(course_data, key=lambda i: i['created_at'].get('S'))
 
     for course in course_data:
@@ -245,16 +233,16 @@ def get_music_by_time(ride_time=None):
 # somewhere to login
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # Force a recycle
+    logout_user()
+    session.clear()
+    session.modified = True
     if request.method == 'POST':
         username = request.form['username']
         psw = request.form['password']
 
-        user = User(username)
-        login_user(user)
-        current_user = load_user(flask_login.current_user.id)
-
         data = {
-            'username_or_email': current_user.name,
+            'username_or_email': username,
             'password': psw
         }
 
@@ -266,24 +254,22 @@ def login():
         session_id = auth_response.get("session_id")
         user_id = auth_response.get("user_id")
         cookies = dict(peloton_session_id=session_id)
-        # now that they're logged in
-        session['SESSION_ID'] = session_id
-        session['USER_ID'] = user_id
-        session['COOKIES'] = cookies
 
-        return redirect("http://pelodashboard.com")
+        response = make_response(redirect("http://pelodashboard.com"))
+        response.set_cookie('USER_ID', session['USER_ID'])
+        return response
 
     else:
         return Response('''
-        <h3>Peloton Login</h3>
-        <p>Please enter your credentials to pull the analytic data.  No credentials will be stored and
-        will simply be passed through to the provider for authorization</p>
-        <form action="" method="post">
-            <p><input type=text name=username>
-            <p><input type=password name=password>
-            <p><input type=submit value=Login>
-        </form>
-        ''')
+                <h3>Peloton Login</h3>
+                <p>Please enter your credentials to pull the analytic data.  No credentials will be stored and
+                will simply be passed through to the provider for authorization</p>
+                <form action="" method="post">
+                    <p><input type=text name=username>
+                    <p><input type=password name=password>
+                    <p><input type=submit value=Login>
+                </form>
+                ''')
 
 
 # somewhere to logout
@@ -291,7 +277,9 @@ def login():
 @login_required
 def logout():
     logout_user()
-    return Response('<p>Logged out</p>')
+    session.clear()
+    session.modified = True
+    return redirect('http://pelodashboard.com/')
 
 
 # handle login failed
