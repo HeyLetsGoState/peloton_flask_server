@@ -8,7 +8,7 @@ from flask_cors import CORS
 from datetime import datetime
 from pytz import timezone
 from connection.peloton_connection import PelotonConnection
-from flask import Flask, jsonify, request, Response, session, abort, url_for, redirect, g
+from flask import Flask, jsonify, request, Response, session, abort, url_for, redirect, g, make_response
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
 
 app = Flask(__name__)
@@ -270,8 +270,9 @@ def login():
         session['USER_ID'] = user_id
         session['COOKIES'] = cookies
 
-        return redirect("http://pelodashboard.com")
-
+        response = make_response(redirect("http://pelodashboard.com"))
+        response.set_cookie('USER_ID', session['USER_ID'])
+        return response
     else:
         return Response('''
         <h3>Peloton Login</h3>
