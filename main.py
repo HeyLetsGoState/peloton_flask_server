@@ -22,7 +22,6 @@ app.config['CORS_HEADERS'] = 'Content-Type'
 client = boto3.client('dynamodb')
 eastern = timezone('US/Eastern')
 
-
 # flask-login
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -214,15 +213,6 @@ def get_music_by_time(ride_time=None):
     return jsonify(music_set)
 
 
-@app.after_request
-def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'http://pelodashboard.com')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    return response
-
-
 # somewhere to login
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -278,6 +268,15 @@ def page_not_found(e):
 @login_manager.user_loader
 def load_user(userid):
     return User(userid)
+
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', 'http://pelodashboard.com')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
 
 
 if __name__ == "__main__":
