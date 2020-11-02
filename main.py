@@ -2,7 +2,6 @@ import boto3
 import json
 from flask_cors import CORS
 from datetime import datetime
-from jproperties import Properties
 from pytz import timezone
 from connection.peloton_connection import PelotonConnection
 from flask import Flask, jsonify, request, Response, session, redirect, make_response
@@ -24,12 +23,6 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 # Force the user to goto /login if they're not logged in
 login_manager.login_view = "login"
-
-p = Properties()
-with open("peloton.properties", "rb") as f:
-    p.load(f, "utf-8")
-
-default_user_id = p["USER_ID"].data
 
 '''
 Create my User Model
@@ -65,7 +58,7 @@ This gets us our labels for the x-axis going from oldest to newest
 
 
 @app.route("/get_labels", methods=['GET'])
-def get_labels(user_id=None):
+def get_labels():
     # I'll  use this as my model for forcing logins in the future
     # current_user = flask_login.current_user.id
     #
@@ -79,8 +72,7 @@ def get_labels(user_id=None):
     )
     averages = items.get("Items")
 
-    user_id = user_id if user_id is not None else default_user_id
-    ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == user_id]
+    ride_times = [r.get("ride_Id") for r in averages]
     ride_times = [datetime.fromtimestamp(int(r.get('S')), tz=eastern).strftime('%Y-%m-%d') for r in ride_times]
     # Why doesn't sort return anything
     ride_times.sort()
@@ -93,16 +85,14 @@ Felt that grabbing the heart-rate info on it's own return was useful for the one
 
 
 @app.route("/get_heart_rate", methods=['GET'])
-def get_heart_rate(user_id=None):
+def get_heart_rate():
     items = client.scan(
         TableName="peloton_ride_data"
     )
 
-    user_id = user_id if user_id is not None else default_user_id
     # Grab my data
     data = items.get("Items")
     # Then sort it
-    data = [d for d in data if d.get('user_id').get('S') == user_id]
     data = sorted(data, key=lambda i: i['ride_Id'].get('S'))
 
     heart_rate = [f.get('Avg Output').get('M').get('heart_rate').get('N') for f in data]
@@ -116,16 +106,12 @@ Generate the chart data for the average outputs of Output/Cadence/Resistance/Spe
 
 
 @app.route("/get_charts", methods=['GET'])
-def get_charts(user_id=None):
+def get_charts():
     items = client.scan(
         TableName="peloton_ride_data"
     )
 
     averages = items.get("Items")
-
-    user_id = user_id if user_id is not None else default_user_id
-    # Trim this down to just ME
-    averages = [a for a in averages if a.get('user_id').get('S') == user_id]
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
     average_output = [f.get("Avg Output").get('M').get("value").get('N') for f in averages]
     average_cadence = [f.get("Avg Cadence").get('M').get("value").get('N') for f in averages]
@@ -188,16 +174,13 @@ Pull back course data information to display in a table
 
 
 @app.route("/course_data")
-def get_course_data(user_id=None):
+def get_course_data():
     items = client.scan(
         TableName="peloton_course_data"
     )
     return_data = {}
 
     course_data = items.get("Items")
-
-    user_id = user_id if user_id is not None else default_user_id
-    course_data = [c for c in course_data if c.get('user_id').get('S') == user_id]
     course_data = sorted(course_data, key=lambda i: i['created_at'].get('S'))
 
     for course in course_data:
@@ -229,10 +212,6 @@ def get_music_by_time(ride_time=None):
 # somewhere to login
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    # Force a recycle
-    logout_user()
-    session.clear()
-    session.modified = True
     if request.method == 'POST':
         username = request.form['username']
         psw = request.form['password']
@@ -273,9 +252,7 @@ def login():
 @login_required
 def logout():
     logout_user()
-    session.clear()
-    session.modified = True
-    return redirect('http://pelodashboard.com/')
+    return Response('<p>Logged out</p>')
 
 
 # handle login failed
