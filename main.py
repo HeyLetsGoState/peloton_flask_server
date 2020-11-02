@@ -65,7 +65,7 @@ This gets us our labels for the x-axis going from oldest to newest
 
 
 @app.route("/get_labels/", methods=['GET'])
-@app.route("get_labels/<user_id>", methods=['GET'])
+@app.route("/get_labels/<user_id>", methods=['GET'])
 def get_labels(user_id=None):
     # I'll  use this as my model for forcing logins in the future
     # current_user = flask_login.current_user.id
