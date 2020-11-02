@@ -8,15 +8,26 @@ from pytz import timezone
 from connection.peloton_connection import PelotonConnection
 from flask import Flask, jsonify, request, Response, session, redirect
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
+from flask_session import Session
 
 app = Flask(__name__)
 app.config.from_object(__name__)
-app.config.update(SECRET_KEY="1234567")
+app.secret_key = 'super secret key'
+app.config['SESSION_TYPE'] = 'filesystem'
+
 conn = PelotonConnection()
+
+Session(app)
+SESSION_TYPE = 'memcached'
+secret_key = "SOMETHING_RANDOM"
 
 # CORS Set-up here and at the bottom
 CORS(app, resources={r'/*': {'origins': '*', 'allowedHeaders': ['Content-Type']}})
-app.config['CORS_HEADERS'] = 'Content-Type'
+# app.config['CORS_HEADERS'] = 'Content-Type'
+app.config.from_mapping(
+    SECRET_KEY="THISISASECRET",
+    CORS_HEADERS='Content-Type'
+)
 client = boto3.client('dynamodb')
 eastern = timezone('US/Eastern')
 
@@ -24,7 +35,6 @@ eastern = timezone('US/Eastern')
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
-
 
 '''
 Create my User Model
@@ -35,6 +45,7 @@ with open("peloton.properties", "rb") as f:
     p.load(f, "utf-8")
 
 default_user_id = p["USER_ID"].data
+
 
 class User(UserMixin):
     def __init__(self, id):
@@ -63,10 +74,10 @@ so yank that out, parse it to a date-time and then sort it and then return it
 This gets us our labels for the x-axis going from oldest to newest
 """
 
+
 @app.route("/pull_user_data", methods=['GET'])
 @login_required
 def pull_user_data():
-
     # Run this daily or set-up a cron to do it for you
     user_id = session['USER_ID']
     cookies = session['COOKIES']
@@ -76,13 +87,14 @@ def pull_user_data():
     resp = jsonify(success=True)
     return resp
 
+
 @app.route("/get_labels", methods=['GET'])
 def get_labels():
-
     items = client.scan(
         TableName="peloton_ride_data"
     )
     averages = items.get("Items")
+    print(f"The user ID is {session.get('USER_ID')}")
 
     if session.get('USER_ID') is not None:
         ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == session['USER_ID']]
@@ -267,7 +279,7 @@ def login():
         session['SESSION_ID'] = session_id
         session['USER_ID'] = user_id
         session['COOKIES'] = cookies
-
+        print(f"Setting the session to {session_id} for user {user_id}")
         return redirect("http://pelodashboard.com")
 
     else:
