@@ -1,5 +1,4 @@
 import boto3
-import datetime
 import flask_login
 import hashlib
 import json
@@ -77,7 +76,7 @@ def get_labels():
     averages = items.get("Items")
 
     ride_times = [r.get("ride_Id") for r in averages]
-    ride_times = [datetime.datetime.fromtimestamp(int(r.get('S')), tz=eastern).strftime('%Y-%m-%d') for r in ride_times]
+    ride_times = [datetime.fromtimestamp(int(r.get('S')), tz=eastern).strftime('%Y-%m-%d') for r in ride_times]
     # Why doesn't sort return anything
     ride_times.sort()
     return jsonify(ride_times)
@@ -193,7 +192,7 @@ def get_course_data():
             'difficulty': course.get('difficulty').get('S'),
             'length': course.get('length').get('S'),
             'instructor': course.get('instructor', {}).get('S'),
-            'date': datetime.datetime.fromtimestamp((int(course.get('created_at', {}).get('S'))), tz=eastern).strftime(
+            'date': datetime.fromtimestamp((int(course.get('created_at', {}).get('S'))), tz=eastern).strftime(
                 '%Y-%m-%d')
         }
 
