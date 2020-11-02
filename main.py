@@ -78,7 +78,7 @@ def pull_user_data():
     resp = jsonify(success=True)
     return resp
 
-@app.route("/get_labels", methods=['GET'])
+@app.route("/get_labels")
 def get_labels():
 
     items = client.scan(
@@ -86,10 +86,10 @@ def get_labels():
     )
     averages = items.get("Items")
 
-    if session.get('USER_ID') is not None:
-        ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == session['USER_ID']]
-    else:
-        ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == default_user_id]
+    user_id = json.loads(request.args.get('user_id'))
+    peloton_id = user_id if user_id is not None else default_user_id
+
+    ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == peloton_id]
     ride_times = [datetime.fromtimestamp(int(r.get('S')), tz=eastern).strftime('%Y-%m-%d') for r in ride_times]
     # Why doesn't sort return anything
     ride_times.sort()
@@ -110,7 +110,11 @@ def get_heart_rate():
     # Grab my data
     data = items.get("Items")
     # Then sort it
-    data = [d for d in data if d.get('user_id').get('S') == default_user_id]
+
+    user_id = json.loads(request.args.get('user_id'))
+    peloton_id = user_id if user_id is not None else default_user_id
+
+    data = [d for d in data if d.get('user_id').get('S') == peloton_id]
     data = sorted(data, key=lambda i: i['ride_Id'].get('S'))
 
     heart_rate = [f.get('Avg Output').get('M').get('heart_rate').get('N') for f in data]
@@ -131,10 +135,11 @@ def get_charts():
 
     averages = items.get("Items")
     # Trim this down to just ME
-    if session.get('USER_ID') is not None:
-        averages = [a for a in averages if a.get('user_id').get('S') == session['USER_ID']]
-    else:
-        averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
+
+    user_id = json.loads(request.args.get('user_id'))
+    peloton_id = user_id if user_id is not None else default_user_id
+
+    averages = [a for a in averages if a.get('user_id').get('S') == peloton_id]
 
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
     average_output = [f.get("Avg Output").get('M').get("value").get('N') for f in averages]
@@ -208,11 +213,11 @@ def get_course_data():
     )
     return_data = {}
 
+    user_id = json.loads(request.args.get('user_id'))
+    peloton_id = user_id if user_id is not None else default_user_id
+
     course_data = items.get("Items")
-    if session.get('USER_ID') is not None:
-        course_data = [c for c in course_data if c.get('user_id').get('S') == session['USER_ID']]
-    else:
-        course_data = [c for c in course_data if c.get('user_id').get('S') == default_user_id]
+    course_data = [c for c in course_data if c.get('user_id').get('S') == peloton_id]
 
     course_data = sorted(course_data, key=lambda i: i['created_at'].get('S'))
 
