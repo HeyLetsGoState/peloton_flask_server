@@ -1,6 +1,7 @@
 import boto3
 import flask_login
 import json
+import sys
 from jproperties import Properties
 from flask_cors import CORS
 from datetime import datetime
@@ -14,20 +15,17 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 app.secret_key = 'super secret key'
 app.config['SESSION_TYPE'] = 'filesystem'
+app.config['CORS_HEADERS'] = 'Content-Type'
 
 conn = PelotonConnection()
 
-Session(app)
 SESSION_TYPE = 'memcached'
 secret_key = "SOMETHING_RANDOM"
-
+sess = Session()
+sess.init_app(app)
 # CORS Set-up here and at the bottom
 CORS(app, resources={r'/*': {'origins': '*', 'allowedHeaders': ['Content-Type']}})
-# app.config['CORS_HEADERS'] = 'Content-Type'
-app.config.from_mapping(
-    SECRET_KEY="THISISASECRET",
-    CORS_HEADERS='Content-Type'
-)
+
 client = boto3.client('dynamodb')
 eastern = timezone('US/Eastern')
 
@@ -79,8 +77,8 @@ This gets us our labels for the x-axis going from oldest to newest
 @login_required
 def pull_user_data():
     # Run this daily or set-up a cron to do it for you
-    user_id = session['USER_ID']
-    cookies = session['COOKIES']
+    user_id = session.get('USER_ID', None)
+    cookies = session.get('COOKIES', None)
     conn.get_most_recent_ride_details(user_id, cookies, True)
     conn.get_most_recent_ride_info(user_id, cookies, True)
 
@@ -94,10 +92,10 @@ def get_labels():
         TableName="peloton_ride_data"
     )
     averages = items.get("Items")
-    print(f"The user ID is {session.get('USER_ID')}")
+    print(f"The user ID is {session.get('USER_ID')}", file=sys.stderr)
 
     if session.get('USER_ID') is not None:
-        ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == session['USER_ID']]
+        ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == session.get('USER_ID')]
     else:
         ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == default_user_id]
     ride_times = [datetime.fromtimestamp(int(r.get('S')), tz=eastern).strftime('%Y-%m-%d') for r in ride_times]
@@ -142,7 +140,7 @@ def get_charts():
     averages = items.get("Items")
     # Trim this down to just ME
     if session.get('USER_ID') is not None:
-        averages = [a for a in averages if a.get('user_id').get('S') == session['USER_ID']]
+        averages = [a for a in averages if a.get('user_id').get('S') == session.get('USER_ID')]
     else:
         averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
 
@@ -188,7 +186,7 @@ def get_user_rollup():
 
     averages = items.get("Items")
     if session.get('USER_ID') is not None:
-        averages = [a for a in averages if a.get('user_id').get('S') == session['USER_ID']]
+        averages = [a for a in averages if a.get('user_id').get('S') == session.get('USER_ID')]
     else:
         averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
 
@@ -219,7 +217,7 @@ def get_course_data():
     return_data = {}
     course_data = items.get("Items")
     if session.get('USER_ID') is not None:
-        course_data = [c for c in course_data if c.get('user_id').get('S') == session['USER_ID']]
+        course_data = [c for c in course_data if c.get('user_id').get('S') == session.get('USER_ID')]
     else:
         course_data = [c for c in course_data if c.get('user_id').get('S') == default_user_id]
 
@@ -279,7 +277,8 @@ def login():
         session['SESSION_ID'] = session_id
         session['USER_ID'] = user_id
         session['COOKIES'] = cookies
-        print(f"Setting the session to {session_id} for user {user_id}")
+        session.modified = True
+
         return redirect("http://pelodashboard.com")
 
     else:
@@ -300,6 +299,8 @@ def login():
 @login_required
 def logout():
     logout_user()
+    session.clear()
+    session.modified = True
     return redirect('http://pelodashboard.com/')
 
 
