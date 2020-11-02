@@ -16,6 +16,7 @@ app.config.from_object(__name__)
 app.secret_key = 'super secret key'
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['CORS_HEADERS'] = 'Content-Type'
+CORS(app, resources={r'/*': {'origins': '*',   'allowedHeaders': ['Content-Type']}})
 
 conn = PelotonConnection()
 
@@ -24,7 +25,7 @@ secret_key = "SOMETHING_RANDOM"
 sess = Session()
 sess.init_app(app)
 # CORS Set-up here and at the bottom
-CORS(app, resources={r'/*': {'origins': '*', 'allowedHeaders': ['Content-Type']}})
+
 
 client = boto3.client('dynamodb')
 eastern = timezone('US/Eastern')
@@ -321,7 +322,7 @@ def load_user(userid):
 
 @app.after_request
 def after_request(response):
-    response.headers.add('Access-Control-Allow-Origin', 'http://pelodashboard.com')
+    response.headers.add('Access-Control-Allow-Origin', 'http://pelodashboard.com/')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
