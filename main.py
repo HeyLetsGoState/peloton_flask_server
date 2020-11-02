@@ -87,7 +87,6 @@ def pull_user_data():
     return resp
 
 
-@app.route("/get_labels/", methods=['GET'])
 @app.route('/get_labels/<user_id>', methods=['GET'])
 def get_labels(user_id=None):
     items = client.scan(
@@ -109,7 +108,6 @@ Felt that grabbing the heart-rate info on it's own return was useful for the one
 """
 
 
-@app.route("/get_heart_rate/", methods=['GET'])
 @app.route('/get_heart_rate/<user_id>', methods=['GET'])
 def get_heart_rate(user_id=None):
     items = client.scan(
@@ -134,7 +132,6 @@ Generate the chart data for the average outputs of Output/Cadence/Resistance/Spe
 """
 
 
-@app.route("/get_charts/", methods=['GET'])
 @app.route('/get_charts/<user_id>', methods=['GET'])
 def get_charts(user_id=None):
     items = client.scan(
@@ -210,9 +207,6 @@ def get_user_rollup():
 """
 Pull back course data information to display in a table
 """
-
-
-@app.route("/course_data/")
 @app.route('/course_data/<user_id>', methods=['GET'])
 def get_course_data(user_id=None):
     items = client.scan(
