@@ -101,7 +101,7 @@ def get_labels(user_id=None):
     ride_times = [datetime.fromtimestamp(int(r.get('S')), tz=eastern).strftime('%Y-%m-%d') for r in ride_times]
     # Why doesn't sort return anything
     ride_times.sort()
-    return jsonify(ride_times)
+    return Response(json.dumps(ride_times), mimetype='application/json')
 
 
 """
@@ -125,7 +125,8 @@ def get_heart_rate(user_id=None):
 
     heart_rate = [f.get('Avg Output').get('M').get('heart_rate').get('N') for f in data]
     heart_rate = [int(h) if h is not None else 0 for h in heart_rate]
-    return jsonify(heart_rate)
+    return Response(json.dumps(heart_rate), mimetype='application/json')
+
 
 
 """
@@ -153,7 +154,7 @@ def get_charts(user_id=None):
     miles_per_ride = [f.get("Avg Output").get('M').get("miles_ridden").get('N') for f in averages]
 
     datasets = [average_output, average_cadence, average_resistance, average_speed, miles_per_ride]
-    return jsonify(datasets)
+    return Response(json.dumps(datasets), mimetype='application/json')
 
 
 @app.route("/peloton_login", methods=['POST'])
@@ -195,13 +196,15 @@ def get_user_rollup():
     total_achievements = averages[-1].get('total_achievements').get('N')
     user_info = conn.get_user_info(user_id, cookies)
 
-    return jsonify({
+    my_resp = {
         'total_miles': miles_ridden,
         'total_rides': user_info.get('total_pedaling_metric_workouts'),
         'total_achievements': total_achievements,
         'photo_url': user_info.get('image_url'),
         'name': f"{user_info.get('first_name')} {user_info.get('last_name')}"
-    })
+    }
+    return Response(json.dumps(my_resp), mimetype='application/json')
+
 
 
 """
@@ -233,7 +236,7 @@ def get_course_data(user_id=None):
                 '%Y-%m-%d')
         }
 
-    return jsonify(return_data)
+    return Response(json.dumps(return_data), mimetype='application/json')
 
 
 @app.route("/music_by_time/<ride_time>")
