@@ -84,10 +84,7 @@ def pull_user_data():
 @app.route("/get_labels/<user_id>")
 def get_labels(user_id=None):
 
-    items = client.scan(
-        TableName="peloton_ride_data"
-    )
-    averages = items.get("Items")
+    averages = dump_table('peloton_ride_data')
     peloton_id = user_id if user_id is not None else default_user_id
 
     ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == peloton_id]
@@ -104,16 +101,11 @@ Felt that grabbing the heart-rate info on it's own return was useful for the one
 
 @app.route("/get_heart_rate/<user_id>", methods=['GET'])
 def get_heart_rate(user_id=None):
-    items = client.scan(
-        TableName="peloton_ride_data"
-    )
-
-    # Grab my data
-    data = items.get("Items")
-    # Then sort it
 
     peloton_id = user_id if user_id is not None else default_user_id
 
+    # Grab and sort data
+    data = dump_table('peloton_ride_data')
     data = [d for d in data if d.get('user_id').get('S') == peloton_id]
     data = sorted(data, key=lambda i: i['ride_Id'].get('S'))
 
@@ -129,15 +121,10 @@ Generate the chart data for the average outputs of Output/Cadence/Resistance/Spe
 
 @app.route("/get_charts/<user_id>", methods=['GET'])
 def get_charts(user_id=None):
-    items = client.scan(
-        TableName="peloton_ride_data"
-    )
-
-    averages = items.get("Items")
-    # Trim this down to just ME
 
     peloton_id = user_id if user_id is not None else default_user_id
 
+    averages = dump_table('peloton_ride_data')
     averages = [a for a in averages if a.get('user_id').get('S') == peloton_id]
 
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
@@ -171,11 +158,7 @@ def peloton_login():
 
 @app.route("/get_user_rollup/<user_id>", methods=['GET'])
 def get_user_rollup(user_id=None):
-    items = client.scan(
-        TableName="peloton_ride_data"
-    )
-
-    averages = items.get("Items")
+    averages = dump_table('peloton_ride_data')
     averages = [a for a in averages if a.get('user_id').get('S') == user_id]
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
     total_rides = len(averages)
@@ -197,13 +180,12 @@ Pull back course data information to display in a table
 
 @app.route("/course_data/<user_id>")
 def get_course_data(user_id=None):
-    items = client.scan(
-        TableName="peloton_course_data"
-    )
+
     return_data = {}
     peloton_id = user_id if user_id is not None else default_user_id
 
-    course_data = items.get("Items")
+    course_data = dump_table('peloton_course_data')
+
     course_data = [c for c in course_data if c.get('user_id').get('S') == peloton_id]
 
     course_data = sorted(course_data, key=lambda i: i['created_at'].get('S'))
@@ -223,12 +205,11 @@ def get_course_data(user_id=None):
 
 @app.route("/music_by_time/<ride_time>")
 def get_music_by_time(ride_time=None):
-    items = client.scan(
-        TableName="peloton_music_sets"
-    )
+
+    music = dump_table('peloton_music_sets')
 
     # TODO - Get a utility class to dump these S's and L's' and the rest from Dynamo
-    music = [i for i in items.get("Items") if i.get('created_at').get('S') == ride_time]
+    music = [i for i in music if i.get('created_at').get('S') == ride_time]
     if music is not None:
         music_set = [song.get('S') for song in music[0].get('set_list').get('L')]
     return jsonify(music_set)
@@ -299,14 +280,24 @@ def load_user(userid):
     return User(userid)
 
 
-@app.after_request
-def after_request(response):
-    #response.headers.add('Access-Control-Allow-Origin', 'http://pelodashboard.com')
-    #response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-    #response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
-    #response.headers.add('Access-Control-Allow-Credentials', 'true')
-    return response
+def dump_table(table_name):
+    results = []
+    last_evaluated_key = None
+    while True:
+        if last_evaluated_key:
+            response = client.scan(
+                TableName=table_name,
+                ExclusiveStartKey=last_evaluated_key
+            )
+        else:
+            response = client.scan(TableName=table_name)
+        last_evaluated_key = response.get('LastEvaluatedKey')
 
+        results.extend(response['Items'])
+
+        if not last_evaluated_key:
+            break
+    return results
 
 if __name__ == "__main__":
     app.run(debug=True)

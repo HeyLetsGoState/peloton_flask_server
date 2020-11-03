@@ -120,6 +120,15 @@ class PelotonConnection:
 
             # At some point it would behove me to purge the dynamo db and move the dupes out of results
             # But for now, we will leave it.  Also, account for no heart rate monitor
+
+            miles_ridden = None
+            # Need to move some of these around to better error handle the json
+            try:
+                miles_ridden = [f for f in performance_res.get("summaries")
+                                if f.get("display_name") == "Distance"][0].get("value")
+            except IndexError:
+                miles_ridden = None
+
             my_json_record = {
                 "Avg Cadence": results.get("Avg Cadence"),
                 "Avg Output": results.get("Avg Output"),
@@ -127,8 +136,7 @@ class PelotonConnection:
                 "Avg Speed": results.get("Avg Speed"),
                 'heart_rate': heart_rate[0].get("average_value") if heart_rate is not None else None,
                 'total_achievements': total_achievements,
-                'miles_ridden': [f for f in performance_res.get("summaries") if f.get("display_name") == "Distance"][
-                    0].get("value"),
+                'miles_ridden': miles_ridden,
                 "created_at": str(created_at),
                 "ride_Id": str(created_at),
                 'workout_hash': str(workout_hash),
