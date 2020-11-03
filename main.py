@@ -8,7 +8,7 @@ from flask_cors import CORS
 from datetime import datetime
 from pytz import timezone
 from connection.peloton_connection import PelotonConnection
-from flask import Flask, jsonify, request, Response, session, abort, url_for, redirect, g, make_response
+from flask import Flask, jsonify, request, Response, session, abort, url_for, redirect, make_response
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
 
 app = Flask(__name__)
@@ -76,7 +76,10 @@ def pull_user_data():
     conn.get_most_recent_ride_info(user_id, cookies, True)
 
     resp = jsonify(success=True)
-    return resp
+    response = make_response(redirect("http://pelodashboard.com"))
+    response.set_cookie('USER_ID', session['USER_ID'])
+    return response
+
 
 @app.route("/get_labels/<user_id>")
 def get_labels(user_id=None):
