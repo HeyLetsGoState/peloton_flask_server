@@ -28,8 +28,19 @@ class PelotonConnection:
     @staticmethod
     def __get_workouts__(self, user_id, cookies):
         # Get my workout information
-        my_workouts_url = f"https://api.onepeloton.com/api/user/{user_id}/workouts"
+        page = 0
+        my_workouts_url = f"https://api.onepeloton.com/api/user/{user_id}/workouts?page={page}"
+        workout_results = []
+
         my_workouts = self.get(my_workouts_url, cookies)
+        workout_results.append(my_workouts)
+
+        if my_workouts.get('show_next') is True:
+            page += 1
+            my_workouts_url = f"https://api.onepeloton.com/api/user/{user_id}/workouts?page={page}"
+            my_workouts = self.get(my_workouts_url, cookies)
+            workout_results.append(my_workouts)
+
 
         # Get my workout ids ONLY for the bike
         my_workouts = [w for w in my_workouts.get("data") if w.get("fitness_discipline") == "cycling"]
