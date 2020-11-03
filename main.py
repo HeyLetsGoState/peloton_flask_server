@@ -169,34 +169,24 @@ def peloton_login():
         'cookies': cookies
     }
 
-
-@app.route("/get_user_rollup", methods=['GET'])
-def get_user_rollup():
-    credentials = request.get_json()
-    cookies = json.loads(request.args.get('cookies'))
-    user_id = request.args.get('user_id')
-
+@app.route("/get_user_rollup/<user_id>", methods=['GET'])
+def get_user_rollup(user_id=None):
     items = client.scan(
         TableName="peloton_ride_data"
     )
 
     averages = items.get("Items")
-    if session.get('USER_ID') is not None:
-        averages = [a for a in averages if a.get('user_id').get('S') == session['USER_ID']]
-    else:
-        averages = [a for a in averages if a.get('user_id').get('S') == default_user_id]
-
+    averages = [a for a in averages if a.get('user_id').get('S') == user_id]
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
+    total_rides = len(averages)
     miles_ridden = sum([float(r.get('Avg Cadence').get('M').get('miles_ridden').get('N')) for r in averages])
     total_achievements = averages[-1].get('total_achievements').get('N')
-    user_info = conn.get_user_info(user_id, cookies)
+
 
     return jsonify({
         'total_miles': miles_ridden,
-        'total_rides': user_info.get('total_pedaling_metric_workouts'),
-        'total_achievements': total_achievements,
-        'photo_url': user_info.get('image_url'),
-        'name': f"{user_info.get('first_name')} {user_info.get('last_name')}"
+        'total_rides': total_rides,
+        'total_achievements': total_achievements
     })
 
 
