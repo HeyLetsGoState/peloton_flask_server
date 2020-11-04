@@ -43,8 +43,8 @@ class PelotonConnection:
 
 
         # Get my workout ids ONLY for the bike
-        my_workouts = [w for w in my_workouts.get("data") if w.get("fitness_discipline") == "cycling"]
-        workout_ids = [workout_id.get("id") for workout_id in my_workouts]
+        my_workouts = [w for w in workout_results.get("data") if w.get("fitness_discipline") == "cycling"]
+        workout_ids = [workout_id.get("id") for workout_id in workout_results]
         return workout_ids
 
     @staticmethod
