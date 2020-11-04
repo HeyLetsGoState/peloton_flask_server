@@ -58,6 +58,14 @@ Just a health-check to make sure we're properly deployed
 def ping():
     return jsonify('pong!')
 
+@app.route('/get_total_users', methods=['GET'])
+def get_user_count():
+    total_users = dump_table('peloton_user')
+    resp_obj = {
+        'total_users' : len(total_users)
+    }
+    return jsonify(resp_obj)
+
 
 """
 We store all of our ride information in dynamo by the unique key of the epcoh
