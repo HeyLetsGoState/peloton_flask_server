@@ -6,7 +6,8 @@ import time
 import json
 import boto3
 from decimal import *
-
+import itertools
+from itertools import chain
 
 class PelotonConnection:
     HEADERS = {
@@ -42,8 +43,13 @@ class PelotonConnection:
             workout_results.append(my_workouts)
 
 
+
         # Get my workout ids ONLY for the bike
-        my_workouts = [w for w in workout_results.get("data") if w.get("fitness_discipline") == "cycling"]
+        workout_results = [w.get('data') for w in workout_results]
+        workout_results = list(itertools.chain.from_iterable(workout_results))
+        workout_results = [w for w in workout_results if w.get('fitness_discipline') == 'cycling'
+         or w.get('metrics_type') == 'cycling']
+
         workout_ids = [workout_id.get("id") for workout_id in workout_results]
         return workout_ids
 
