@@ -172,7 +172,7 @@ def get_user_rollup(user_id=None):
     averages = [a for a in averages if a.get('user_id').get('S') == user_id]
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
     total_rides = len(averages)
-    miles_ridden = sum([float(r.get('Avg Cadence').get('M').get('miles_ridden').get('N')) for r in averages])
+    miles_ridden = sum([float(r.get('Avg Cadence').get('M').get('miles_ridden').get('N', 0)) for r in averages])
     total_achievements = averages[-1].get('total_achievements').get('N')
 
 
@@ -195,6 +195,9 @@ def get_course_data(user_id=None):
 
     # Get all the workout hashes for the given user
     user_workouts = __get_user_workouts__(user_id)
+    if user_workouts.get('Items') is None:
+        raise InvalidUsage('Your Peloton Data is missing.  Please try re-loading your data from the home page. Please try again', status_code=204)
+
     ride_list = [r.get('S') for r in user_workouts['Item'].get('ride_list').get('L')]
 
     # Cross reference against the course data to bring back minimal record set
