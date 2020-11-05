@@ -1,13 +1,12 @@
+import boto3
 import hashlib
-from hashlib import sha1
-
+import itertools
+import json
 import requests
 import time
-import json
-import boto3
+
 from decimal import *
-import itertools
-from itertools import chain
+
 
 class PelotonConnection:
     HEADERS = {
@@ -41,8 +40,6 @@ class PelotonConnection:
             my_workouts_url = f"https://api.onepeloton.com/api/user/{user_id}/workouts?page={page}"
             my_workouts = self.get(my_workouts_url, cookies)
             workout_results.append(my_workouts)
-
-
 
         # Get my workout ids ONLY for the bike
         workout_results = [w.get('data') for w in workout_results]
@@ -92,15 +89,15 @@ class PelotonConnection:
                     heart_rate = [f for f in performance_res.get("metrics")
                                   if f.get("display_name") == "Heart Rate"] or None
                     result = {
-                        'name': average.get('display_name'),
-                        'unit': average.get('display_unit'),
-                        'value': average.get('value'),
+                        'name': average.get('display_name', None),
+                        'unit': average.get('display_unit', None),
+                        'value': average.get('value', None),
                         'distance': [f for f in performance_res.get("summaries")
-                                     if f.get("display_name") == 'Distance'][0].get("value"),
+                                     if f.get("display_name", []) == 'Distance'][0].get("value", None),
                         'heart_rate': heart_rate[0].get("average_value") if heart_rate is not None else None,
                         'total_achievements': total_achievements,
                         'miles_ridden': [f for f in performance_res.get("summaries") if f.get("display_name") == "Distance"][
-                            0].get("value"),
+                            0].get("value", None),
                         'user_id': user_id
                     }
                     results[average.get('display_name')] = result
@@ -122,7 +119,6 @@ class PelotonConnection:
             encoded = json.dumps(d, sort_keys=True).encode()
             dhash.update(encoded)
             workout_hash = dhash.hexdigest()
-
 
             # At some point it would behove me to purge the dynamo db and move the dupes out of results
             # But for now, we will leave it.  Also, account for no heart rate monitor
@@ -203,7 +199,7 @@ class PelotonConnection:
                             "created_at": str(created_at),
                             "difficulty": str(ride_id_details.get('ride').get('difficulty_rating_avg')),
                             "instructor": instructor,
-                            "length": str(time.strftime("%H:%M:%S", time.gmtime(ride_id_details.get('ride').get('duration')))),
+                            "length": str(time.strftime("%H:%M:%S", time.gmtime(ride_id_details.get('ride').get('duration', None)))),
                             "name": ride_id_details.get('ride').get('title'),
                             "workout_hash": str(workout_hash),
                             'user_id': user_id
@@ -213,7 +209,7 @@ class PelotonConnection:
             # Also people wanted the music
             if instructor is not None:
                 song_list = [song for song in ride_id_details.get("playlist").get("songs")]
-                set_list = [f"{f.get('title')} by {f.get('artists')[0].get('artist_name')}" for f in song_list]
+                set_list = [f"{f.get('title')} by {f.get('artists', None)[0].get('artist_name', None)}" for f in song_list]
 
                 table = boto3.resource('dynamodb').Table('peloton_music_sets')
                 if save is True:

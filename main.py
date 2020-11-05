@@ -1,8 +1,8 @@
 import boto3
 import flask_login
-import hashlib
 import json
-import random
+
+from connection.invalid_usage import InvalidUsage
 from jproperties import Properties
 from flask_cors import CORS
 from datetime import datetime
@@ -78,14 +78,16 @@ This gets us our labels for the x-axis going from oldest to newest
 def pull_user_data():
 
     # Run this daily or set-up a cron to do it for you
-    user_id = session['USER_ID']
+    user_id = session.get('USER_ID', None)
     cookies = session['COOKIES']
     conn.get_most_recent_ride_details(user_id, cookies, True)
     conn.get_most_recent_ride_info(user_id, cookies, True)
 
-    resp = jsonify(success=True)
+    if user_id is None:
+        raise InvalidUsage('Your peloton credentials were invalid.  Please verify and try again', status_code=401)
+
     response = make_response(redirect("http://pelodashboard.com"))
-    response.set_cookie('USER_ID', session['USER_ID'])
+    response.set_cookie('USER_ID', user_id)
     return response
 
 
@@ -188,23 +190,34 @@ Pull back course data information to display in a table
 
 @app.route("/course_data/<user_id>")
 def get_course_data(user_id=None):
-
+    dynamodb = boto3.resource('dynamodb')
     return_data = {}
-    peloton_id = user_id if user_id is not None else default_user_id
 
-    course_data = dump_table('peloton_course_data')
+    # Get all the workout hashes for the given user
+    user_workouts = __get_user_workouts__(user_id)
+    ride_list = [r.get('S') for r in user_workouts['Item'].get('ride_list').get('L')]
 
-    course_data = [c for c in course_data if c.get('user_id').get('S') == peloton_id]
+    # Cross reference against the course data to bring back minimal record set
+    peloton_ride_data_table = dynamodb.Table('peloton_course_data')
+    batch_keys = {
+        peloton_ride_data_table.name: {
+            'Keys': [{'workout_hash': user_hash} for user_hash in ride_list]
+        }
+    }
 
-    course_data = sorted(course_data, key=lambda i: i['created_at'].get('S'))
+    # Bring back the data && sort it
+    response = dynamodb.batch_get_item(RequestItems=batch_keys)
+    response = [c for c in response.get('Responses').get('peloton_course_data')]
+    response = sorted(response, key=lambda i: i['created_at'])
+    # course_data = sorted(course_data, key=lambda i: i['created_at'].get('S'))
 
-    for course in course_data:
-        return_data[course.get('created_at').get('S')] = {
-            'name': course.get('name').get('S'),
-            'difficulty': course.get('difficulty').get('S'),
-            'length': course.get('length').get('S'),
-            'instructor': course.get('instructor', {}).get('S'),
-            'date': datetime.fromtimestamp((int(course.get('created_at', {}).get('S'))), tz=eastern).strftime(
+    for course in response:
+        return_data[course.get('created_at')] = {
+            'name': course.get('name'),
+            'difficulty': course.get('difficulty'),
+            'length': course.get('length'),
+            'instructor': course.get('instructor', {}),
+            'date': datetime.fromtimestamp((int(course.get('created_at', {}))), tz=eastern).strftime(
                 '%Y-%m-%d')
         }
 
@@ -245,12 +258,15 @@ def login():
 
         # Create the cookie, yank the user ID and the session ID
         session_id = auth_response.get("session_id")
-        user_id = auth_response.get("user_id")
+        user_id = auth_response.get("user_id", None)
         cookies = dict(peloton_session_id=session_id)
         # now that they're logged in
         session['SESSION_ID'] = session_id
         session['USER_ID'] = user_id
         session['COOKIES'] = cookies
+
+        if user_id is None:
+            raise InvalidUsage('Your Peloton Credentials were invalid.  Please try again', status_code=401)
 
         response = make_response(redirect("http://pelodashboard.com"))
         response.set_cookie('USER_ID', user_id)
@@ -287,6 +303,11 @@ def page_not_found(e):
 def load_user(userid):
     return User(userid)
 
+@app.errorhandler(InvalidUsage)
+def handle_invalid_usage(error):
+    response = jsonify(error.to_dict())
+    response.status_code = error.status_code
+    return response
 
 def dump_table(table_name):
     results = []
@@ -306,6 +327,17 @@ def dump_table(table_name):
         if not last_evaluated_key:
             break
     return results
+
+
+def __get_user_workouts__(user_id):
+    response = client.get_item(
+        TableName="peloton_user",
+        Key={
+            'user_id': {'S': user_id}
+        }
+    )
+    return response
+
 
 if __name__ == "__main__":
     app.run(debug=True)
