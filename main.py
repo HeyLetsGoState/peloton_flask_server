@@ -88,6 +88,8 @@ def pull_user_data():
 
     response = make_response(redirect("http://pelodashboard.com"))
     response.set_cookie('USER_ID', user_id)
+
+    __update_user_data()
     return response
 
 
@@ -195,7 +197,7 @@ def get_course_data(user_id=None):
 
     # Get all the workout hashes for the given user
     user_workouts = __get_user_workouts__(user_id)
-    if user_workouts.get('Items') is None:
+    if user_workouts.get('Item') is None:
         raise InvalidUsage('Your Peloton Data is missing.  Please try re-loading your data from the home page. Please try again', status_code=204)
 
     ride_list = [r.get('S') for r in user_workouts['Item'].get('ride_list').get('L')]
@@ -341,6 +343,23 @@ def __get_user_workouts__(user_id):
     )
     return response
 
+
+def __update_user_data():
+    riders = dump_table("peloton_ride_data")
+    distinct_riders = set([r.get('user_id').get('S') for r in riders])
+
+    # Now lets build out that user table
+    table = boto3.resource('dynamodb').Table('peloton_user')
+
+    for rider in distinct_riders:
+        rider_info = [r for r in riders if r.get('user_id').get('S') == rider]
+        workout_ids = [r.get('workout_hash').get('S') for r in rider_info]
+        ride_item = {
+            'user_id': rider,
+            'ride_list': workout_ids
+        }
+        ddb_data = json.loads(json.dumps(ride_item))
+        table.put_item(Item=ddb_data)
 
 if __name__ == "__main__":
     app.run(debug=True)
