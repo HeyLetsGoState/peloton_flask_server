@@ -58,6 +58,7 @@ Just a health-check to make sure we're properly deployed
 def ping():
     return jsonify('pong!')
 
+
 @app.route('/get_total_users', methods=['GET'])
 def get_user_count():
     total_users = dump_table('peloton_user')
@@ -295,6 +296,20 @@ def login():
 def logout():
     logout_user()
     return Response('<p>Logged out</p>')
+
+
+
+@app.route('/totals', methods=['GET'])
+def get_total_rides():
+    total_rides = dump_table('peloton_ride_data')
+    total_users = dump_table('peloton_user')
+
+    resp_obj = {
+        'total_rides' : len(total_rides),
+        'total_users': len(total_users),
+        'total_miles': sum([int(float(r.get('miles_ridden').get('N', 0))) for r in total_rides])
+    }
+    return jsonify(resp_obj)
 
 
 # handle login failed
