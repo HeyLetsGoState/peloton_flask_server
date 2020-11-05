@@ -6,6 +6,7 @@ import requests
 import time
 
 from decimal import *
+client = boto3.client('dynamodb')
 
 
 class PelotonConnection:
@@ -165,6 +166,8 @@ class PelotonConnection:
     '''
     def get_most_recent_ride_info(self, user_id=None, cookies=None, save=False):
         workout_ids = PelotonConnection.__get_workouts__(self, user_id, cookies)
+        workout_hash_list = []
+
         for workout_id in workout_ids:
             workout_url = f"https://api.onepeloton.com/api/workout/{workout_id}"
             workout = self.get(workout_url, cookies)
@@ -191,16 +194,20 @@ class PelotonConnection:
             dhash.update(encoded)
             workout_hash = dhash.hexdigest()
 
+            if instructor is None:
+                instructor = "Free Ride"
+
             if instructor is not None:
                 table = boto3.resource('dynamodb').Table('peloton_course_data')
                 if save is True:
+                    workout_hash_list.append(workout_hash)
                     table.put_item(
                         Item={
                             "created_at": str(created_at),
-                            "difficulty": str(ride_id_details.get('ride').get('difficulty_rating_avg')),
+                            "difficulty": str(ride_id_details.get('ride', {}).get('difficulty_rating_avg', "N/A")),
                             "instructor": instructor,
-                            "length": str(time.strftime("%H:%M:%S", time.gmtime(ride_id_details.get('ride').get('duration', None)))),
-                            "name": ride_id_details.get('ride').get('title'),
+                            "length": str(time.strftime("%H:%M:%S", time.gmtime(ride_id_details.get('ride', {}).get('duration', workout.get('end_time') - workout.get('created_at'))))),
+                            "name": ride_id_details.get('ride', {}).get('title', workout.get('title')),
                             "workout_hash": str(workout_hash),
                             'user_id': user_id
                         }
@@ -208,7 +215,7 @@ class PelotonConnection:
 
             # Also people wanted the music
             if instructor is not None:
-                song_list = [song for song in ride_id_details.get("playlist").get("songs")]
+                song_list = [song for song in ride_id_details.get("playlist", {}).get("songs", {})]
                 set_list = [f"{f.get('title')} by {f.get('artists', None)[0].get('artist_name', None)}" for f in song_list]
 
                 table = boto3.resource('dynamodb').Table('peloton_music_sets')
@@ -222,4 +229,29 @@ class PelotonConnection:
                         }
                     )
 
+        ride_item = {
+            'user_id': user_id,
+            'ride_list': workout_hash_list
+        }
+        ddb_data = json.loads(json.dumps(ride_item))
+        table = boto3.resource('dynamodb').Table('peloton_user')
+        table.put_item(Item=ddb_data)
 
+    def dump_table(self,table_name):
+        results = []
+        last_evaluated_key = None
+        while True:
+            if last_evaluated_key:
+                response = client.scan(
+                    TableName=table_name,
+                    ExclusiveStartKey=last_evaluated_key
+                )
+            else:
+                response = client.scan(TableName=table_name)
+            last_evaluated_key = response.get('LastEvaluatedKey')
+
+            results.extend(response['Items'])
+
+            if not last_evaluated_key:
+                break
+        return results
