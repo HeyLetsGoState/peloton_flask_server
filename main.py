@@ -10,11 +10,16 @@ from pytz import timezone
 from connection.peloton_connection import PelotonConnection
 from flask import Flask, jsonify, request, Response, session, abort, url_for, redirect, make_response
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
+from flask_caching import Cache
 
 app = Flask(__name__)
 app.config.from_object(__name__)
 app.config.update(SECRET_KEY="1234567")
 conn = PelotonConnection()
+
+cache = Cache(config={'CACHE_TYPE': 'simple'})
+cache.init_app(app)
+
 
 # CORS Set-up here and at the bottom
 CORS(app, resources={r'/*': {'origins': '*', 'allowedHeaders': ['Content-Type']}})
@@ -91,10 +96,12 @@ def pull_user_data():
     response.set_cookie('USER_ID', user_id)
 
     __update_user_data()
+    cache.clear()
     return response
 
 
 @app.route("/get_labels/<user_id>")
+@cache.cached(timeout=3600, query_string=True)
 def get_labels(user_id=None):
 
     averages = dump_table('peloton_ride_data')
@@ -113,6 +120,7 @@ Felt that grabbing the heart-rate info on it's own return was useful for the one
 
 
 @app.route("/get_heart_rate/<user_id>", methods=['GET'])
+@cache.cached(timeout=3600, query_string=True)
 def get_heart_rate(user_id=None):
 
     peloton_id = user_id if user_id is not None else default_user_id
@@ -133,6 +141,7 @@ Generate the chart data for the average outputs of Output/Cadence/Resistance/Spe
 
 
 @app.route("/get_charts/<user_id>", methods=['GET'])
+@cache.cached(timeout=3600, query_string=True)
 def get_charts(user_id=None):
 
     peloton_id = user_id if user_id is not None else default_user_id
@@ -170,6 +179,7 @@ def peloton_login():
     }
 
 @app.route("/get_user_rollup/<user_id>", methods=['GET'])
+@cache.cached(timeout=3600, query_string=True)
 def get_user_rollup(user_id=None):
     averages = dump_table('peloton_ride_data')
     averages = [a for a in averages if a.get('user_id').get('S') == user_id]
@@ -192,6 +202,7 @@ Pull back course data information to display in a table
 
 
 @app.route("/course_data/<user_id>")
+@cache.cached(timeout=3600, query_string=True)
 def get_course_data(user_id=None):
     dynamodb = boto3.resource('dynamodb')
     return_data = {}
@@ -231,6 +242,7 @@ def get_course_data(user_id=None):
 
 
 @app.route("/music_by_time/<ride_time>")
+@cache.cached(timeout=3600, query_string=True)
 def get_music_by_time(ride_time=None):
 
     music = dump_table('peloton_music_sets')
@@ -279,14 +291,87 @@ def login():
         return response
     else:
         return Response('''
-        <h3>Peloton Login</h3>
-        <p>Please enter your credentials to pull the analytic data.  No credentials will be stored and
-        will simply be passed through to the provider for authorization</p>
-        <form action="" method="post">
-            <p><input type=text name=username>
-            <p><input type=password name=password>
-            <p><input type=submit value=Login>
-        </form>
+<link href="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" id="bootstrap-css">
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<!------ Include the above in your HEAD tag ---------->
+
+<!doctype html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Fonts -->
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css?family=Raleway:300,400,600" rel="stylesheet" type="text/css">
+
+    <link rel="stylesheet" href="css/style.css">
+
+    <link rel="icon" href="Favicon.png">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+
+    <title>PeloDashboard Sign-In</title>
+</head>
+<body>
+
+<main class="login-form">
+    <div class="cotainer">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body">
+                        <form action="" method="post"">
+                            <div class="form-group row">
+                                <label for="email_address" class="col-md-4 col-form-label text-md-right">Username or E-Mail Address</label>
+                                <div class="col-md-6">
+                                    <input type="text" class="form-control" name="username" required autofocus>
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <label for="password" class="col-md-4 col-form-label text-md-right">Password</label>
+                                <div class="col-md-6">
+                                    <input type="password" id="password" class="form-control" name="password" required>
+                                </div>
+                            </div>
+
+                            <div class="form-group row">
+                                <div class="col-md-6 offset-md-4">
+                                    <div class="checkbox">
+                                        <label>
+                                            <input type="checkbox" name="remember"> Remember Me
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 offset-md-4">
+                                <button type="submit" class="btn btn-primary">
+                                    Sign-In
+                                </button>
+                            </div>
+                    </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+
+</main>
+
+
+
+
+
+
+
+</body>
+</html>
         ''')
 
 
@@ -300,6 +385,7 @@ def logout():
 
 
 @app.route('/totals', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def get_total_rides():
     total_rides = dump_table('peloton_ride_data')
     total_users = dump_table('peloton_user')
