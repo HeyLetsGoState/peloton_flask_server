@@ -63,11 +63,41 @@ class PelotonConnection:
     def get_most_recent_ride_details(self, user_id=None, cookies=None, save=False):
         # Get the most recent workout ID
         workout_ids = PelotonConnection.__get_workouts__(self, user_id, cookies)
+
+        """
+        TODO: To clear some tech debt start adding the ride_id to the previous entries or find a way to 
+        better do this.  I can't be itterating hundreds of rides
+        """
+        averages = self.dump_table('peloton_user')
+        rides = [f for f in averages if f.get('user_id').get('S') == user_id]
+        rides = [r.get('S') for r in rides[0].get('ride_list').get('L')]
+
         for workout_id in workout_ids:
+
             workout_url = f"https://api.onepeloton.com/api/workout/{workout_id}"
             # Get the workout info
             workout = self.get(workout_url, cookies)
             created_at = workout.get("created_at")
+
+            d = {
+                'created_at': created_at,
+                'workout_id': workout.get('id'),
+                'bike_id': workout.get('peloton_id')
+            }
+
+            """
+            Now that more than one user wants to use this thing, we need to make each record super unique
+            So we'll take the created at and the workout id and make that the hash.
+            We'll combine the time of the ride, the id of the ride and the id of the bike
+            """
+
+            dhash = hashlib.md5()
+            encoded = json.dumps(d, sort_keys=True).encode()
+            dhash.update(encoded)
+            workout_hash = dhash.hexdigest()
+
+            if workout_hash in rides:
+                continue
 
             achievements_url = f"https://api.onepeloton.com/api/user/{user_id}/achievements"
             achievements = self.get(achievements_url, cookies)
@@ -105,21 +135,7 @@ class PelotonConnection:
                 except:
                     print("Drop it to the floor")
 
-            """
-            Now that more than one user wants to use this thing, we need to make each record super unique
-            So we'll take the created at and the workout id and make that the hash.
-            We'll combine the time of the ride, the id of the ride and the id of the bike
-            """
-            d = {
-                'created_at': created_at,
-                'workout_id': workout.get('id'),
-                'bike_id': workout.get('peloton_id')
-            }
 
-            dhash = hashlib.md5()
-            encoded = json.dumps(d, sort_keys=True).encode()
-            dhash.update(encoded)
-            workout_hash = dhash.hexdigest()
 
             # At some point it would behove me to purge the dynamo db and move the dupes out of results
             # But for now, we will leave it.  Also, account for no heart rate monitor
@@ -168,20 +184,18 @@ class PelotonConnection:
         workout_ids = PelotonConnection.__get_workouts__(self, user_id, cookies)
         workout_hash_list = []
 
+        """
+        TODO: To clear some tech debt start adding the ride_id to the previous entries or find a way to 
+        better do this.  I can't be itterating hundreds of rides
+        """
+        averages = self.dump_table('peloton_user')
+        rides = [f for f in averages if f.get('user_id').get('S') == user_id]
+        rides = [r.get('S') for r in rides[0].get('ride_list').get('L')]
+
         for workout_id in workout_ids:
             workout_url = f"https://api.onepeloton.com/api/workout/{workout_id}"
             workout = self.get(workout_url, cookies)
             created_at = workout.get("created_at")
-            # Then get the ride_id for that workout
-            ride_id = workout.get("ride").get("id")
-            ride_id_details_url = f"https://api.onepeloton.com/api/ride/{ride_id}/details"
-            ride_id_details = self.get(ride_id_details_url, cookies)
-
-            # In the event you did one of those non-workout rides
-            try:
-                instructor = ride_id_details.get('ride').get('instructor').get('name')
-            except Exception:
-                instructor = None
 
             d = {
                 'created_at': created_at,
@@ -193,6 +207,20 @@ class PelotonConnection:
             encoded = json.dumps(d, sort_keys=True).encode()
             dhash.update(encoded)
             workout_hash = dhash.hexdigest()
+
+            if workout_hash in rides:
+                continue
+
+            # Then get the ride_id for that workout
+            ride_id = workout.get("ride").get("id")
+            ride_id_details_url = f"https://api.onepeloton.com/api/ride/{ride_id}/details"
+            ride_id_details = self.get(ride_id_details_url, cookies)
+
+            # In the event you did one of those non-workout rides
+            try:
+                instructor = ride_id_details.get('ride').get('instructor').get('name')
+            except Exception:
+                instructor = None
 
             if instructor is None:
                 instructor = "Free Ride"
