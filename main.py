@@ -18,9 +18,16 @@ app.config.from_object(__name__)
 app.config.update(SECRET_KEY="1234567")
 conn = PelotonConnection()
 
-cache = Cache(config={'CACHE_TYPE': 'redis'})
-cache.init_app(app)
+try:
+    """
+    In a local environment you can't use redis (well you could by why would you)
+    """
+    redis.Redis.ping()
+    cache = Cache(config={'CACHE_TYPE': 'redis'})
+except Exception:
+    cache = Cache(config={'CACHE_TYPE': 'simple'})
 
+cache.init_app(app)
 
 # CORS Set-up here and at the bottom
 CORS(app, resources={r'/*': {'origins': '*', 'allowedHeaders': ['Content-Type']}})
@@ -97,10 +104,29 @@ def pull_user_data():
     response.set_cookie('USER_ID', user_id)
 
     __update_user_data()
-    # cache.clear()
     __delete_keys__(user_id=user_id)
     return response
 
+
+@app.route("/ride_graph/<ride_hash>")
+@cache.cached(timeout=3600, query_string=True)
+def get_ride_graph(ride_hash=None):
+    rides = dump_table('peloton_graph_data')
+    my_ride = [r for r in rides if r.get('workout_hash').get('S') == ride_hash][0]
+
+    return_obj = {
+        'output': [o.get('N') for o in my_ride.get('metrics').get('M').get('Output').get('L')],
+        'cadence': [o.get('N') for o in my_ride.get('metrics').get('M').get('Cadence').get('L')],
+        'resistance': [r.get('N') for r in my_ride.get('metrics').get('M').get('Resistance').get('L')],
+        'speed': [r.get('N') for r in my_ride.get('metrics').get('M').get('Speed').get('L')],
+        'totals': {
+            'calories': my_ride.get('summaries').get('M').get('Calories').get('N'),
+            'distance': my_ride.get('summaries').get('M').get('Distance').get('N'),
+            'total_output': my_ride.get('summaries').get('M').get('Total Output').get('N'),
+        }
+    }
+
+    return jsonify(return_obj)
 
 @app.route("/get_labels/<user_id>")
 @cache.cached(timeout=3600, query_string=True)
