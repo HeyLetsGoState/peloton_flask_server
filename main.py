@@ -235,7 +235,8 @@ def get_course_data(user_id=None):
             'length': course.get('length'),
             'instructor': course.get('instructor', {}),
             'date': datetime.fromtimestamp((int(course.get('created_at', {}))), tz=eastern).strftime(
-                '%Y-%m-%d')
+                '%Y-%m-%d'),
+            'workout_hash': course.get('workout_hash')
         }
 
     return jsonify(return_data)
