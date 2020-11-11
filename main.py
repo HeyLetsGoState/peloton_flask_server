@@ -10,7 +10,8 @@ from pytz import timezone
 from connection.peloton_connection import PelotonConnection
 from flask import Flask, jsonify, request, Response, session, abort, url_for, redirect, make_response
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
-from flask_caching import Cache
+from flask_caching import Cache, make_template_fragment_key
+
 
 app = Flask(__name__)
 app.config.from_object(__name__)
@@ -462,6 +463,26 @@ def __update_user_data():
         }
         ddb_data = json.loads(json.dumps(ride_item))
         table.put_item(Item=ddb_data)
+
+
+def __delete_keys(user_id=None):
+    """
+    This should speed up the caching a bit and let this thing scale a bit easier.
+    One day I'll quit being cheap and move off the t2.micro
+    :param user_id:  the person to clear out
+    :return:
+    """
+    heart_rate_key = f'flask_cache_/get_heart_rate/{user_id}'
+    key = make_template_fragment_key(heart_rate_key)
+    cache.delete(key)
+
+    labels_key = f"flask_cache_/get_labels/{user_id}"
+    key = make_template_fragment_key(labels_key)
+    cache.delete(key)
+
+    course_key = f"flask_cache_/course_data/{user_id}"
+    key = make_template_fragment_key(course_key)
+    cache.delete(key)
 
 
 if __name__ == "__main__":
