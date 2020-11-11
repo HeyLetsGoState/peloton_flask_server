@@ -463,5 +463,6 @@ def __update_user_data():
         ddb_data = json.loads(json.dumps(ride_item))
         table.put_item(Item=ddb_data)
 
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host='0.0.0.0')
