@@ -97,7 +97,8 @@ def pull_user_data():
     response.set_cookie('USER_ID', user_id)
 
     __update_user_data()
-    cache.clear()
+    # cache.clear()
+    __delete_keys__(user_id=user_id)
     return response
 
 
@@ -465,7 +466,7 @@ def __update_user_data():
         table.put_item(Item=ddb_data)
 
 
-def __delete_keys(user_id=None):
+def __delete_keys__(user_id=None):
     """
     This should speed up the caching a bit and let this thing scale a bit easier.
     One day I'll quit being cheap and move off the t2.micro
