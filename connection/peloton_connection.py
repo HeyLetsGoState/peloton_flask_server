@@ -72,8 +72,12 @@ class PelotonConnection:
         better do this.  I can't be itterating hundreds of rides
         """
         averages = self.dump_table('peloton_user')
-        rides = [f for f in averages if f.get('user_id').get('S') == user_id]
-        rides = [r.get('S') for r in rides[0].get('ride_list').get('L')]
+        rides = None
+        try:
+            rides = [f for f in averages if f.get('user_id').get('S') == user_id]
+            rides = [r.get('S') for r in rides[0].get('ride_list').get('L')]
+        except Exception:
+            rides = None
 
         graphs = self.dump_table('peloton_graph_data')
         graphs = [g for g in graphs if g.get('user_id').get('S') == user_id]
@@ -125,8 +129,12 @@ class PelotonConnection:
                     table.put_item(Item=ddb_data)
 
 
-            if workout_hash in rides:
-                continue
+            try:
+                if workout_hash in rides:
+                    continue
+            except Exception:
+                print()
+
             achievements_url = f"https://api.onepeloton.com/api/user/{user_id}/achievements"
             achievements = self.get(achievements_url, cookies)
             achievements = [f for f in [a.get("achievements") for a in achievements.get("categories")]]
@@ -219,8 +227,12 @@ class PelotonConnection:
         better do this.  I can't be itterating hundreds of rides
         """
         averages = self.dump_table('peloton_user')
-        rides = [f for f in averages if f.get('user_id').get('S') == user_id]
-        rides = [r.get('S') for r in rides[0].get('ride_list').get('L')]
+        rides = None
+        try:
+             rides = [f for f in averages if f.get('user_id').get('S') == user_id]
+             rides = [r.get('S') for r in rides[0].get('ride_list').get('L')]
+        except Exception:
+             rides = None
 
         for workout_id in workout_ids:
             workout_url = f"https://api.onepeloton.com/api/workout/{workout_id}"
@@ -238,8 +250,11 @@ class PelotonConnection:
             dhash.update(encoded)
             workout_hash = dhash.hexdigest()
 
-            # if workout_hash in rides:
-            #     continue
+            try:
+                if workout_hash in rides:
+                     continue
+            except Exception:
+                print('')
 
             # Then get the ride_id for that workout
             ride_id = workout.get("ride").get("id")
