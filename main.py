@@ -1,7 +1,7 @@
 import boto3
 import flask_login
 import json
-
+import redis
 from connection.invalid_usage import InvalidUsage
 from jproperties import Properties
 from flask_cors import CORS
@@ -17,7 +17,7 @@ app.config.from_object(__name__)
 app.config.update(SECRET_KEY="1234567")
 conn = PelotonConnection()
 
-cache = Cache(config={'CACHE_TYPE': 'simple'})
+cache = Cache(config={'CACHE_TYPE': 'redis'})
 cache.init_app(app)
 
 
@@ -465,4 +465,4 @@ def __update_user_data():
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0')
+    app.run(host='0.0.0.0', debug=True)
