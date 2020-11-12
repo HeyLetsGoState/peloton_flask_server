@@ -117,7 +117,8 @@ class PelotonConnection:
                     'averages': dict([(f.get('display_name') , f.get('value')) for f in graph.get('average_summaries')]),
                     'summaries': dict([(f.get('display_name'), f.get('value')) for f in graph.get('summaries')]),
                     'metrics': dict([(f.get('display_name'), f.get('values')) for f in graph.get('metrics')]),
-                    'user_id': user_id
+                    'user_id': user_id,
+                    'seconds_since_pedaling_start': graph.get('seconds_since_pedaling_start')
                 }
 
                 table = boto3.resource('dynamodb').Table('peloton_graph_data')
