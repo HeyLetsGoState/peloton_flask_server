@@ -119,7 +119,8 @@ def get_ride_graph(ride_hash=None):
             'calories': my_ride.get('summaries').get('M').get('Calories').get('N'),
             'distance': my_ride.get('summaries').get('M').get('Distance').get('N'),
             'total_output': my_ride.get('summaries').get('M').get('Total Output').get('N'),
-        }
+        },
+        'seconds_since_start': [s.get('N') for s in my_ride.get('seconds_since_pedaling_start').get('L')]
     }
 
     return jsonify(return_obj)
