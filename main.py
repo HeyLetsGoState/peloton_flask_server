@@ -61,14 +61,12 @@ class User(UserMixin):
         return "%d/%s/%s/%s" % (self.id, self.name, self.password)
 
 
-"""
-Just a health-check to make sure we're properly deployed
-"""
-
-
 @app.route("/ping", methods=['GET'])
 @login_required
 def ping():
+    """
+    Just a health-check to make sure we're properly deployed
+    """
     return jsonify('pong!')
 
 
@@ -81,16 +79,14 @@ def get_user_count():
     return jsonify(resp_obj)
 
 
-"""
-We store all of our ride information in dynamo by the unique key of the epcoh
-so yank that out, parse it to a date-time and then sort it and then return it
-This gets us our labels for the x-axis going from oldest to newest
-"""
-
 @app.route("/pull_user_data", methods=['GET'])
 @login_required
 def pull_user_data():
-
+    """
+    We store all of our ride information in dynamo by the unique key of the epcoh
+    so yank that out, parse it to a date-time and then sort it and then return it
+    This gets us our labels for the x-axis going from oldest to newest
+    """
     # Run this daily or set-up a cron to do it for you
     user_id = session.get('USER_ID', None)
     cookies = session['COOKIES']
@@ -142,15 +138,29 @@ def get_labels(user_id=None):
     return jsonify(ride_times)
 
 
-"""
-Felt that grabbing the heart-rate info on it's own return was useful for the one-off Heart Rate Chart
-"""
+@app.route("/get_ride_charts/<user_id>")
+@cache.cached(timeout=3600, query_string=True)
+def get_ride_charts(user_id=None):
+
+    averages = dump_table('peloton_ride_data')
+    peloton_id = user_id if user_id is not None else default_user_id
+
+    rides_with_hash = [(r.get('ride_Id').get('S'), r.get('workout_hash').get('S')) for r in averages if r.get('user_id').get('S') == peloton_id]
+    rides_with_hash = [((datetime.fromtimestamp(int(r[0]), tz=eastern).strftime('%Y-%m-%d')), r[1]) for r in rides_with_hash]
+
+    """
+    Why doesn't sort return anything?  Because it doesn't feel like it 
+    """
+    rides_with_hash.sort()
+    return jsonify(rides_with_hash)
 
 
 @app.route("/get_heart_rate/<user_id>", methods=['GET'])
 @cache.cached(timeout=3600, query_string=True)
 def get_heart_rate(user_id=None):
-
+    """
+    Felt that grabbing the heart-rate info on it's own return was useful for the one-off Heart Rate Chart
+    """
     peloton_id = user_id if user_id is not None else default_user_id
 
     # Grab and sort data
@@ -163,15 +173,13 @@ def get_heart_rate(user_id=None):
     return jsonify(heart_rate)
 
 
-"""
-Generate the chart data for the average outputs of Output/Cadence/Resistance/Speed/Miles
-"""
-
 
 @app.route("/get_charts/<user_id>", methods=['GET'])
 @cache.cached(timeout=3600, query_string=True)
 def get_charts(user_id=None):
-
+    """
+    Generate the chart data for the average outputs of Output/Cadence/Resistance/Speed/Miles
+    """
     peloton_id = user_id if user_id is not None else default_user_id
 
     averages = dump_table('peloton_ride_data')
@@ -224,14 +232,12 @@ def get_user_rollup(user_id=None):
     })
 
 
-"""
-Pull back course data information to display in a table
-"""
-
-
 @app.route("/course_data/<user_id>")
 @cache.cached(timeout=3600, query_string=True)
 def get_course_data(user_id=None):
+    """
+    Pull back course data information to display in a table
+    """
     dynamodb = boto3.resource('dynamodb')
     return_data = {}
 
