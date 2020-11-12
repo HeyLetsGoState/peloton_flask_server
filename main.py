@@ -169,7 +169,7 @@ def get_heart_rate(user_id=None):
     data = [d for d in data if d.get('user_id').get('S') == peloton_id]
     data = sorted(data, key=lambda i: i['ride_Id'].get('S'))
 
-    heart_rate = [f.get('Avg Output').get('M').get('heart_rate').get('N') for f in data]
+    heart_rate = [f.get('Avg Output', {}).get('M', {}).get('heart_rate', {}).get('N', 0) for f in data]
     heart_rate = [int(h) if h is not None else 0 for h in heart_rate]
     return jsonify(heart_rate)
 
@@ -187,11 +187,11 @@ def get_charts(user_id=None):
     averages = [a for a in averages if a.get('user_id').get('S') == peloton_id]
 
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
-    average_output = [f.get("Avg Output").get('M').get("value").get('N') for f in averages]
-    average_cadence = [f.get("Avg Cadence").get('M').get("value").get('N') for f in averages]
-    average_resistance = [f.get("Avg Resistance").get('M').get("value").get('N') for f in averages]
-    average_speed = [f.get("Avg Speed").get('M').get("value").get('N') for f in averages]
-    miles_per_ride = [f.get("Avg Output").get('M').get("miles_ridden").get('N') for f in averages]
+    average_output = [f.get("Avg Output", {}).get('M', {}).get("value", {}).get('N', 0) for f in averages]
+    average_cadence = [f.get("Avg Cadence", {}).get('M', {}).get("value", {}).get('N', 0) for f in averages]
+    average_resistance = [f.get("Avg Resistance", {}).get('M', {}).get("value", {}).get('N', 0) for f in averages]
+    average_speed = [f.get("Avg Speed", {}).get('M', {}).get("value", {}).get('N', 0) for f in averages]
+    miles_per_ride = [f.get("Avg Output", {}).get('M', {}).get("miles_ridden", {}).get('N', 0) for f in averages]
 
     datasets = [average_output, average_cadence, average_resistance, average_speed, miles_per_ride]
     return jsonify(datasets)
