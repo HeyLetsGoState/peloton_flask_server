@@ -223,8 +223,11 @@ def get_user_rollup(user_id=None):
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
     total_rides = len(averages)
     miles_ridden = sum([float(r.get('Avg Cadence').get('M').get('miles_ridden').get('N', 0)) for r in averages])
-    total_achievements = averages[-1].get('total_achievements').get('N')
-
+    total_achievements = None
+    try:
+        total_achievements = averages[-1].get('total_achievements').get('N')
+    except Exception:
+        total_achievements : "0"
 
     return jsonify({
         'total_miles': miles_ridden,
