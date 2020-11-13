@@ -107,8 +107,11 @@ def pull_user_data():
 @app.route("/ride_graph/<ride_hash>")
 @cache.cached(timeout=3600, query_string=True)
 def get_ride_graph(ride_hash=None):
-    rides = dump_table('peloton_graph_data')
-    my_ride = [r for r in rides if r.get('workout_hash').get('S') == ride_hash][0]
+    if ride_hash == 0:
+        my_ride = {}
+    else:
+        rides = dump_table('peloton_graph_data')
+        my_ride = [r for r in rides if r.get('workout_hash').get('S') == ride_hash][0]
 
     return_obj = {
         'output': [o.get('N') for o in my_ride.get('metrics').get('M').get('Output').get('L')],
