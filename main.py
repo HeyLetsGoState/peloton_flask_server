@@ -21,9 +21,10 @@ conn = PelotonConnection()
 try:
     """
     In a local environment you can't use redis (well you could by why would you)
+    And for now I won't either until I can figure out the key issue.
     """
     redis.Redis.ping()
-    cache = Cache(config={'CACHE_TYPE': 'redis'})
+    cache = Cache(config={'CACHE_TYPE': 'simple'})
 except Exception:
     cache = Cache(config={'CACHE_TYPE': 'simple'})
 
