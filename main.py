@@ -227,9 +227,7 @@ def peloton_login():
 @cache.cached(timeout=3600, query_string=True)
 def get_achievements(user_id=None):
     user_id = session.get('USER_ID', None)
-    cookies = session['COOKIES']
-
-    return jsonify(conn.get_achievements(user_id, cookies))
+    return jsonify(conn.get_achievements(user_id))
 
 
 @app.route("/get_user_rollup/<user_id>", methods=['GET'])
@@ -522,23 +520,24 @@ def __update_user_data():
 
 
 def __delete_keys__(user_id: str):
+    cache.clear()
     """
-    This should speed up the caching a bit and let this thing scale a bit easier.
-    One day I'll quit being cheap and move off the t2.micro
-    :param user_id:  the person to clear out
-    :return:
-    """
-
-    if user_id is None:
-        return
-
-    pattern = f"*{user_id}*"
-    cache.delete_memoized('/get_user_rollup/', user_id)
-    cache.delete_memoized('/course_data/', user_id)
-    cache.delete_memoized('/get_user_rollup/', user_id)
-    cache.delete_memoized('/get_charts/', user_id)
-    cache.delete_memoized('/get_heart_rate', user_id)
-    cache.delete_memoized('/get_ride_charts' , user_id)
+    # This should speed up the caching a bit and let this thing scale a bit easier.
+    # One day I'll quit being cheap and move off the t2.micro
+    # :param user_id:  the person to clear out
+    # :return:
+    # """
+    #
+    # if user_id is None:
+    #     return
+    #
+    # pattern = f"*{user_id}*"
+    # cache.delete_memoized('/get_user_rollup/', user_id)
+    # cache.delete_memoized('/course_data/', user_id)
+    # cache.delete_memoized('/get_user_rollup/', user_id)
+    # cache.delete_memoized('/get_charts/', user_id)
+    # cache.delete_memoized('/get_heart_rate', user_id)
+    # cache.delete_memoized('/get_ride_charts' , user_id)
 
 
 if __name__ == "__main__":
