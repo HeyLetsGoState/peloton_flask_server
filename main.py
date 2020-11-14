@@ -226,7 +226,7 @@ def get_achievements(user_id=None):
     user_id = session.get('USER_ID', None)
     cookies = session['COOKIES']
 
-    return conn.get_achievements(user_id, cookies)
+    return jsonify(conn.get_achievements(user_id, cookies))
 
 
 @app.route("/get_user_rollup/<user_id>", methods=['GET'])
