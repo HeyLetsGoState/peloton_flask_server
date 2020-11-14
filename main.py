@@ -111,22 +111,25 @@ def get_ride_graph(ride_hash=None):
     else:
         rides = dump_table('peloton_graph_data')
 
-        my_ride = [r for r in rides if r.get('workout_hash').get('S') == ride_hash][0]
+        try:
+            my_ride = [r for r in rides if r.get('workout_hash').get('S') == ride_hash][0]
+        except Exception:
+            return jsonify({})
 
-    return_obj = {
-        'output': [o.get('N') for o in my_ride.get('metrics').get('M').get('Output').get('L')],
-        'cadence': [o.get('N') for o in my_ride.get('metrics').get('M').get('Cadence').get('L')],
-        'resistance': [r.get('N') for r in my_ride.get('metrics').get('M').get('Resistance').get('L')],
-        'speed': [r.get('N') for r in my_ride.get('metrics').get('M').get('Speed').get('L')],
-        'totals': {
-            'calories': my_ride.get('summaries').get('M').get('Calories').get('N'),
-            'distance': my_ride.get('summaries').get('M').get('Distance').get('N'),
-            'total_output': my_ride.get('summaries').get('M').get('Total Output').get('N'),
-        },
-        'seconds_since_start': [s.get('N') for s in my_ride.get('seconds_since_pedaling_start').get('L')]
-    }
+        return_obj = {
+            'output': [o.get('N') for o in my_ride.get('metrics').get('M').get('Output').get('L')],
+            'cadence': [o.get('N') for o in my_ride.get('metrics').get('M').get('Cadence').get('L')],
+            'resistance': [r.get('N') for r in my_ride.get('metrics').get('M').get('Resistance').get('L')],
+            'speed': [r.get('N') for r in my_ride.get('metrics').get('M').get('Speed').get('L')],
+            'totals': {
+                'calories': my_ride.get('summaries').get('M').get('Calories').get('N'),
+                'distance': my_ride.get('summaries').get('M').get('Distance').get('N'),
+                'total_output': my_ride.get('summaries').get('M').get('Total Output').get('N'),
+            },
+            'seconds_since_start': [s.get('N') for s in my_ride.get('seconds_since_pedaling_start').get('L')]
+        }
 
-    return jsonify(return_obj)
+        return jsonify(return_obj)
 
 
 @app.route("/get_labels/<user_id>")
