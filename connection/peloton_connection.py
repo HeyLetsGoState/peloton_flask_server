@@ -27,6 +27,30 @@ class PelotonConnection:
     def get(self, address, cookies):
         return requests.get(address, headers=self.HEADERS, cookies=cookies).json()
 
+    def __get_achievements__(self, user_id, cookies):
+        """
+        One day I'll get better at nested comprehensions but for now this the best I can do
+        At least it's not a super long method in JAVA
+        :param self:
+        :param user_id:
+        :param cookies:
+        :return:
+        """
+        achievements_url = f"https://api.onepeloton.com/api/user/{user_id}/achievements"
+        achievements_details = self.get(achievements_url, cookies)
+        achievements = [f for f in [a.get('achievements') for a in achievements_details.get('categories')]]
+        achievements = [t.get('template') for t in [f for f in list(itertools.chain.from_iterable(achievements)) if f.get('count') > 0]]
+
+        dict = []
+        for achievement in achievements:
+            dict.append({
+                'name': achievement.get('name'),
+                'image_url': achievement.get('image_url'),
+                'description': achievement.get('description')
+            })
+
+        return dict
+
     @staticmethod
     def __get_workouts__(self, user_id, cookies):
         # Get my workout information
@@ -73,11 +97,11 @@ class PelotonConnection:
         """
         averages = self.dump_table('peloton_user')
         rides = None
-        try:
-            rides = [f for f in averages if f.get('user_id').get('S') == user_id]
-            rides = [r.get('S') for r in rides[0].get('ride_list').get('L')]
-        except Exception:
-            rides = None
+        # try:
+        #     rides = [f for f in averages if f.get('user_id').get('S') == user_id]
+        #     rides = [r.get('S') for r in rides[0].get('ride_list').get('L')]
+        # except Exception:
+        #     rides = None
 
         graphs = self.dump_table('peloton_graph_data')
         graphs = [g for g in graphs if g.get('user_id').get('S') == user_id]
@@ -208,11 +232,8 @@ class PelotonConnection:
 
         # This is just a sanity check coming back from Dynamo
 
-    def get_user_info(self, user_id=None, cookies=None):
-        user_info = PelotonConnection.__get_user__(self, user_id, cookies)
-        return user_info
-
-
+    def get_achievements(self, user_id=None, cookies=None):
+        return PelotonConnection.__get_achievements__(self,user_id=user_id, cookies=cookies)
 
     '''
     Similar to the get_most_recent_ride this will go and grab the most recent record

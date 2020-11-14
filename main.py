@@ -1,29 +1,26 @@
 import boto3
 import flask_login
 import json
-import redis
 from connection.invalid_usage import InvalidUsage
 from jproperties import Properties
 from flask_cors import CORS
 from datetime import datetime
 from pytz import timezone
 from connection.peloton_connection import PelotonConnection
-from flask import Flask, jsonify, request, Response, session, abort, url_for, redirect, make_response
+from flask import Flask, jsonify, request, Response, session, redirect, make_response
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
-from flask_caching import Cache, make_template_fragment_key
+from flask_caching import Cache
 
 
 app = Flask(__name__)
 app.config.from_object(__name__)
 app.config.update(SECRET_KEY="1234567")
 conn = PelotonConnection()
-
 try:
     """
     In a local environment you can't use redis (well you could by why would you)
     And for now I won't either until I can figure out the key issue.
     """
-    redis.Redis.ping()
     cache = Cache(config={'CACHE_TYPE': 'simple'})
 except Exception:
     cache = Cache(config={'CACHE_TYPE': 'simple'})
@@ -51,6 +48,7 @@ with open("peloton.properties", "rb") as f:
     p.load(f, "utf-8")
 
 default_user_id = p["USER_ID"].data
+
 
 class User(UserMixin):
     def __init__(self, id):
@@ -128,6 +126,7 @@ def get_ride_graph(ride_hash=None):
     }
 
     return jsonify(return_obj)
+
 
 @app.route("/get_labels/<user_id>")
 @cache.cached(timeout=3600, query_string=True)
@@ -219,6 +218,16 @@ def peloton_login():
         'cookies': cookies
     }
 
+
+@app.route("/achievements/<user_id>", methods=['GET'])
+@cache.cached(timeout=3600, query_string=True)
+def get_achievements(user_id=None):
+    user_id = session.get('USER_ID', None)
+    cookies = session['COOKIES']
+
+    return conn.get_achievements(user_id, cookies)
+
+
 @app.route("/get_user_rollup/<user_id>", methods=['GET'])
 @cache.cached(timeout=3600, query_string=True)
 def get_user_rollup(user_id=None):
@@ -231,7 +240,7 @@ def get_user_rollup(user_id=None):
     try:
         total_achievements = averages[-1].get('total_achievements').get('N')
     except Exception:
-        total_achievements : "0"
+        total_achievements: "0"
 
     return jsonify({
         'total_miles': miles_ridden,
@@ -252,7 +261,8 @@ def get_course_data(user_id=None):
     # Get all the workout hashes for the given user
     user_workouts = __get_user_workouts__(user_id)
     if user_workouts.get('Item') is None:
-        raise InvalidUsage('Your Peloton Data is missing.  Please try re-loading your data from the home page. Please try again', status_code=204)
+        raise InvalidUsage('Your Peloton Data is missing.  '
+                           'Please try re-loading your data from the home page. Please try again', status_code=204)
 
     ride_list = [r.get('S') for r in user_workouts['Item'].get('ride_list').get('L')]
 
@@ -293,7 +303,7 @@ def get_music_by_time(ride_time=None):
     # TODO - Get a utility class to dump these S's and L's' and the rest from Dynamo
     music = [i for i in music if i.get('created_at').get('S') == ride_time]
     if music is not None:
-        music_set = [song.get('S') for song in music[0].get('set_list').get('L')]
+        music_set = [song.get('S', None) for song in music[0].get('set_list', {}).get('L', {})]
     return jsonify(music_set)
 
 
@@ -426,7 +436,6 @@ def logout():
     return Response('<p>Logged out</p>')
 
 
-
 @app.route('/totals', methods=['GET'])
 @cache.cached(timeout=60, query_string=True)
 def get_total_rides():
@@ -434,7 +443,7 @@ def get_total_rides():
     total_users = dump_table('peloton_user')
 
     resp_obj = {
-        'total_rides' : len(total_rides),
+        'total_rides': len(total_rides),
         'total_users': len(total_users),
         'total_miles': sum([int(float(r.get('miles_ridden').get('N', 0))) for r in total_rides])
     }
@@ -452,11 +461,13 @@ def page_not_found(e):
 def load_user(userid):
     return User(userid)
 
+
 @app.errorhandler(InvalidUsage)
 def handle_invalid_usage(error):
     response = jsonify(error.to_dict())
     response.status_code = error.status_code
     return response
+
 
 def dump_table(table_name):
     results = []
@@ -506,24 +517,24 @@ def __update_user_data():
         table.put_item(Item=ddb_data)
 
 
-def __delete_keys__(user_id=None):
+def __delete_keys__(user_id: str):
     """
     This should speed up the caching a bit and let this thing scale a bit easier.
     One day I'll quit being cheap and move off the t2.micro
     :param user_id:  the person to clear out
     :return:
     """
-    heart_rate_key = f'flask_cache_/get_heart_rate/{user_id}'
-    key = make_template_fragment_key(heart_rate_key)
-    cache.delete(key)
 
-    labels_key = f"flask_cache_/get_labels/{user_id}"
-    key = make_template_fragment_key(labels_key)
-    cache.delete(key)
+    if user_id is None:
+        return
 
-    course_key = f"flask_cache_/course_data/{user_id}"
-    key = make_template_fragment_key(course_key)
-    cache.delete(key)
+    pattern = f"*{user_id}*"
+    cache.delete_memoized('/get_user_rollup/', user_id)
+    cache.delete_memoized('/course_data/', user_id)
+    cache.delete_memoized('/get_user_rollup/', user_id)
+    cache.delete_memoized('/get_charts/', user_id)
+    cache.delete_memoized('/get_heart_rate', user_id)
+    cache.delete_memoized('/get_ride_charts' , user_id)
 
 
 if __name__ == "__main__":
