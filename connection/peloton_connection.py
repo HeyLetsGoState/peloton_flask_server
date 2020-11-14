@@ -132,7 +132,7 @@ class PelotonConnection:
             dhash.update(encoded)
             workout_hash = dhash.hexdigest()
 
-            performance_graph_url = f"https://api.onepeloton.com/api/workout/{workout_id}/performance_graph"
+            performance_graph_url = f"https://api.onepeloton.com/api/workout/{workout_id}/performance_graph?every_n=5"
             graph = self.get(performance_graph_url, cookies)
 
             if workout_hash not in graphs:
