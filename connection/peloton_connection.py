@@ -4,6 +4,7 @@ import itertools
 import json
 import requests
 import time
+from connection.invalid_usage import InvalidUsage
 
 from decimal import *
 
@@ -69,12 +70,15 @@ class PelotonConnection:
 
         # Get my workout ids ONLY for the bike
         workout_results = [w.get('data') for w in workout_results]
-        workout_results = list(itertools.chain.from_iterable(workout_results))
-        workout_results = [w for w in workout_results if w.get('fitness_discipline') == 'cycling'
-                           or w.get('metrics_type') == 'cycling']
+        try:
+            workout_results = list(itertools.chain.from_iterable(workout_results))
+            workout_results = [w for w in workout_results if w.get('fitness_discipline') == 'cycling'
+                               or w.get('metrics_type') == 'cycling']
 
-        workout_ids = [workout_id.get("id") for workout_id in workout_results]
-        return workout_ids
+            workout_ids = [workout_id.get("id") for workout_id in workout_results]
+            return workout_ids
+        except Exception:
+            raise InvalidUsage('There was an issue pulling your workouts, please try again later', status_code=401)
 
     @staticmethod
     def __get_user__(self, user_id, cookies):
@@ -208,12 +212,18 @@ class PelotonConnection:
             except IndexError:
                 miles_ridden = None
 
+            heart_rate = None
+            try:
+                heart_rate = heart_rate[0].get("average_value", 0)
+            except Exception:
+                heart_rate = 0
+
             my_json_record = {
                 "Avg Cadence": results.get("Avg Cadence"),
                 "Avg Output": results.get("Avg Output"),
                 "Avg Resistance": results.get("Avg Resistance"),
                 "Avg Speed": results.get("Avg Speed"),
-                'heart_rate': heart_rate[0].get("average_value") if heart_rate is not None else None,
+                'heart_rate': heart_rate,
                 'total_achievements': total_achievements,
                 'miles_ridden': miles_ridden,
                 "created_at": str(created_at),
