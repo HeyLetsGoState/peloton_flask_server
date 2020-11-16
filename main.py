@@ -520,7 +520,8 @@ def __update_user_data():
 
 
 def __delete_keys__(user_id: str):
-    cache.clear()
+    with app.app_context():
+        cache.clear()
     """
     # This should speed up the caching a bit and let this thing scale a bit easier.
     # One day I'll quit being cheap and move off the t2.micro
