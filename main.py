@@ -133,6 +133,7 @@ def get_ride_graph(ride_hash=None):
 
 
 @app.route("/get_labels/<user_id>")
+@cache.cached(timeout=3600, query_string=True)
 def get_labels(user_id=None):
 
     averages = dump_table('peloton_ride_data')
@@ -146,6 +147,7 @@ def get_labels(user_id=None):
 
 
 @app.route("/get_ride_charts/<user_id>")
+@cache.cached(timeout=3600, query_string=True)
 def get_ride_charts(user_id=None):
 
     averages = dump_table('peloton_ride_data')
@@ -162,6 +164,7 @@ def get_ride_charts(user_id=None):
 
 
 @app.route("/get_heart_rate/<user_id>", methods=['GET'])
+@cache.cached(timeout=3600, query_string=True)
 def get_heart_rate(user_id=None):
     """
     Felt that grabbing the heart-rate info on it's own return was useful for the one-off Heart Rate Chart
@@ -180,6 +183,7 @@ def get_heart_rate(user_id=None):
 
 
 @app.route("/get_charts/<user_id>", methods=['GET'])
+@cache.cached(timeout=3600, query_string=True)
 def get_charts(user_id=None):
     """
     Generate the chart data for the average outputs of Output/Cadence/Resistance/Speed/Miles
@@ -220,12 +224,14 @@ def peloton_login():
 
 
 @app.route("/achievements/<user_id>", methods=['GET'])
+@cache.cached(timeout=3600, query_string=True)
 def get_achievements(user_id=None):
     user_id = session.get('USER_ID', None)
     return jsonify(conn.get_achievements(user_id))
 
 
 @app.route("/get_user_rollup/<user_id>", methods=['GET'])
+@cache.cached(timeout=3600, query_string=True)
 def get_user_rollup(user_id=None):
     averages = dump_table('peloton_ride_data')
     averages = [a for a in averages if a.get('user_id').get('S') == user_id]
@@ -246,6 +252,7 @@ def get_user_rollup(user_id=None):
 
 
 @app.route("/course_data/<user_id>")
+@cache.cached(timeout=3600, query_string=True)
 def get_course_data(user_id=None):
     """
     Pull back course data information to display in a table
@@ -290,6 +297,7 @@ def get_course_data(user_id=None):
 
 
 @app.route("/music_by_time/<ride_time>")
+@cache.cached(timeout=3600, query_string=True)
 def get_music_by_time(ride_time=None):
 
     music = dump_table('peloton_music_sets')
