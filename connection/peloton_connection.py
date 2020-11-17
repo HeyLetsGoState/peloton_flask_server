@@ -229,7 +229,8 @@ class PelotonConnection:
                 "created_at": str(created_at),
                 "ride_Id": str(created_at),
                 'workout_hash': str(workout_hash),
-                'user_id': user_id
+                'user_id': user_id,
+                'workout_id': workout.get('id')
             }
 
             table = boto3.resource('dynamodb').Table('peloton_ride_data')
@@ -241,6 +242,24 @@ class PelotonConnection:
                 table.put_item(Item=ddb_data)
 
         # This is just a sanity check coming back from Dynamo
+
+
+    def get_ride_history(self, user_id=None, cookies=None):
+        ride_data = self.dump_table('peloton_ride_data')
+        ride_history_dict = {}
+        try:
+            ride_ids = set([r.get('ride_Id').get('S') for r in ride_data if r.get('user_id').get('S') == user_id])
+            for ride in ride_ids:
+                if ride in ride_history_dict:
+                    ride_history_dict[ride].append(r.get('workout_hash') for r in ride_data if r.get('ride_Id') == ride)
+                else:
+                    ride_history_dict[ride] = []
+                    ride_history_dict[ride].append([r.get('workout_hash').get('S') for r in ride_data if r.get('ride_Id').get('S') == ride])
+
+        except Exception:
+            print('error')
+
+        return ride_history_dict
 
     def get_achievements(self, user_id=None, cookies=None):
         return PelotonConnection.__get_achievements__(self,user_id=user_id, cookies=cookies)
