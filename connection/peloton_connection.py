@@ -158,11 +158,12 @@ class PelotonConnection:
                     table.put_item(Item=ddb_data)
 
 
-            try:
-                if workout_hash in rides:
-                    continue
-            except Exception:
-                print()
+            if rides is not None:
+                try:
+                    if workout_hash in rides:
+                        continue
+                except Exception as e:
+                    print(e)
 
             achievements_url = f"https://api.onepeloton.com/api/user/{user_id}/achievements"
             achievements = self.get(achievements_url, cookies)
@@ -198,8 +199,8 @@ class PelotonConnection:
                         'user_id': user_id
                     }
                     results[average.get('display_name')] = result
-                except:
-                    print("Drop it to the floor")
+                except Exception as e :
+                    print(e)
 
             # At some point it would behove me to purge the dynamo db and move the dupes out of results
             # But for now, we will leave it.  Also, account for no heart rate monitor
@@ -230,7 +231,7 @@ class PelotonConnection:
                 "ride_Id": str(created_at),
                 'workout_hash': str(workout_hash),
                 'user_id': user_id,
-                'workout_id': workout.get('id')
+                'peloton_id': workout.get('ride').get('live_stream_id')
             }
 
             table = boto3.resource('dynamodb').Table('peloton_ride_data')
@@ -238,28 +239,49 @@ class PelotonConnection:
             ddb_data = json.loads(json.dumps(my_json_record), parse_float=Decimal)
             # Toss the json into Dynamo
 
-            if save is True:
-                table.put_item(Item=ddb_data)
+            try:
+                if save is True:
+                    return_obj = table.put_item(Item=ddb_data)
+                    print(return_obj)
+                    print()
+            except Exception as e:
+                print(e)
 
         # This is just a sanity check coming back from Dynamo
 
+    def get_ride_history(self, user_id=None, ride_id=None):
+        """
+        So what we're going to do here is pull out all the rides a user took
+        Then get a set (unique rides) and then see if a ride they've passed in
+        was taken another time
 
-    def get_ride_history(self, user_id=None, cookies=None):
+        For instance ride_id [1605579426] is exact same ride as [1603761858]
+        And we can see that all of our metrics improved from ride one to ride two
+        So we want to pull this out so the user can see it
+
+        What we'll have to do is return this info and then generate the chart(s) from this information.
+        I guess what we'll do for now is just show the last two times we took it.  But we'll deal with that problem
+        on the front-end.  The only job right here is to just do the data dump
+        :param user_id:
+        :param ride_id:
+        :return:
+        """
         ride_data = self.dump_table('peloton_ride_data')
         ride_history_dict = {}
         try:
-            ride_ids = set([r.get('ride_Id').get('S') for r in ride_data if r.get('user_id').get('S') == user_id])
+            ride_ids = set([r.get('peloton_id').get('S') for r in ride_data if r.get('user_id').get('S') == user_id])
+            user_rides = [r for r in ride_data if r.get('user_id').get('S') == user_id]
             for ride in ride_ids:
-                if ride in ride_history_dict:
-                    ride_history_dict[ride].append(r.get('workout_hash') for r in ride_data if r.get('ride_Id') == ride)
-                else:
-                    ride_history_dict[ride] = []
-                    ride_history_dict[ride].append([r.get('workout_hash').get('S') for r in ride_data if r.get('ride_Id').get('S') == ride])
+                workout_hash = [u.get('workout_hash').get('S') for u in user_rides if u.get('peloton_id').get('S') == ride]
+                __ride__ = [u.get('ride_Id').get('S') for u in user_rides if u.get('peloton_id').get('S') == ride]
+                ride_history_dict[ride] = (workout_hash, __ride__)
+        except Exception as e:
+            print(e)
 
-        except Exception:
-            print('error')
+        ride_id_to_workout_hash = [f[1][0] for f in ride_history_dict.items() if ride_id in f[1][1]]
+        flat_list = [item for sublist in ride_id_to_workout_hash for item in sublist]
 
-        return ride_history_dict
+        return flat_list
 
     def get_achievements(self, user_id=None, cookies=None):
         return PelotonConnection.__get_achievements__(self,user_id=user_id, cookies=cookies)

@@ -103,6 +103,12 @@ def pull_user_data():
     return response
 
 
+@app.route("/ride_graph/history/<user_id>/<ride_id>")
+@cache.cached(timeout=3600, query_string=True)
+def get_ride_history(user_id=None, ride_id=None):
+    return jsonify(conn.get_ride_history(user_id, ride_id))
+
+
 @app.route("/ride_graph/<ride_hash>")
 @cache.cached(timeout=3600, query_string=True)
 def get_ride_graph(ride_hash=None):
