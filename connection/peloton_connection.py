@@ -62,16 +62,15 @@ class PelotonConnection:
         my_workouts = self.get(my_workouts_url, cookies)
         workout_results.append(my_workouts)
 
-        if my_workouts.get('show_next') is True:
+        while my_workouts.get('show_next') is True:
             page += 1
             my_workouts_url = f"https://api.onepeloton.com/api/user/{user_id}/workouts?page={page}"
             my_workouts = self.get(my_workouts_url, cookies)
             workout_results.append(my_workouts)
 
-        # Get my workout ids ONLY for the bike
-        workout_results = [w.get('data') for w in workout_results]
+        final_results = list(itertools.chain([w.get('data') for w in workout_results]))
+        workout_results = [y for x in final_results for y in x]
         try:
-            workout_results = list(itertools.chain.from_iterable(workout_results))
             workout_results = [w for w in workout_results if w.get('fitness_discipline') == 'cycling'
                                or w.get('metrics_type') == 'cycling']
 
