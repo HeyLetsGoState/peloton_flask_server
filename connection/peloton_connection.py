@@ -100,6 +100,11 @@ class PelotonConnection:
         better do this.  I can't be itterating hundreds of rides
         """
         rides = None
+
+        # Get all the workout hashes for the given user
+        user_workouts = self.__get_user_workouts__(user_id)
+        # rides = [r.get('S') for r in user_workouts['Item'].get('ride_list').get('L')]
+
         table = dynamodb.Table('peloton_graph_data')
         response = table.query(
             IndexName="user_id-index",
@@ -407,3 +412,13 @@ class PelotonConnection:
             if not last_evaluated_key:
                 break
         return results
+
+    @staticmethod
+    def __get_user_workouts__(user_id=None):
+        response = client.get_item(
+            TableName="peloton_user",
+            Key={
+                'user_id': {'S': user_id}
+            }
+        )
+        return response

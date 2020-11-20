@@ -231,6 +231,19 @@ def peloton_login():
     user_id = auth_response.get("user_id")
     cookies = dict(peloton_session_id=session_id)
 
+    table = dynamodb.Table('peloton_user')
+    rider_info = table.query(
+        KeyConditionExpression=Key('user_id').eq(user_id)
+    )
+
+    ride_item = {
+        'user_id' : user_id,
+        'ride_list': rider_info['Items'][0].get('ride_list')
+    }
+
+    ddb_data = json.loads(json.dumps(ride_item))
+    table.put_item(Item=ddb_data)
+
     return {
         'user_id': user_id,
         'cookies': cookies
@@ -279,6 +292,9 @@ def get_course_data(user_id=None):
     if user_workouts.get('Item') is None:
         raise InvalidUsage('Your Peloton Data is missing.  '
                            'Please try re-loading your data from the home page. Please try again', status_code=204)
+
+    if len(user_workouts['Item'].get('ride_list').get('L')) == 0:
+        pull_user_data()
 
     ride_list = [r.get('S') for r in user_workouts['Item'].get('ride_list').get('L')]
 
