@@ -198,7 +198,7 @@ class PelotonConnection:
                         'user_id': user_id
                     }
                     results[average.get('display_name')] = result
-                except Exception as e :
+                except Exception as e:
                     print(e)
 
             # At some point it would behove me to purge the dynamo db and move the dupes out of results

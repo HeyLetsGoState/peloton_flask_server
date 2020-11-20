@@ -1,6 +1,7 @@
 import boto3
 import flask_login
 import json
+from boto3.dynamodb.conditions import Key
 from connection.invalid_usage import InvalidUsage
 from jproperties import Properties
 from flask_cors import CORS
@@ -16,6 +17,8 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 app.config.update(SECRET_KEY="1234567")
 conn = PelotonConnection()
+dynamodb = boto3.resource('dynamodb')
+
 try:
     """
     In a local environment you can't use redis (well you could by why would you)
@@ -98,7 +101,7 @@ def pull_user_data():
     response = make_response(redirect("http://pelodashboard.com"))
     response.set_cookie('USER_ID', user_id)
 
-    __update_user_data()
+    __update_user_data(user_id)
     __delete_keys__(user_id=user_id)
     return response
 
@@ -141,13 +144,13 @@ def get_ride_graph(ride_hash=None):
 @app.route("/get_labels/<user_id>")
 @cache.cached(timeout=3600, query_string=True)
 def get_labels(user_id=None):
+    if user_id is None:
+        user_id = default_user_id
 
-    averages = dump_table('peloton_ride_data')
-    peloton_id = user_id if user_id is not None else default_user_id
+    ride_data = __get_user_labels__(user_id)
 
-    ride_times = [r.get("ride_Id") for r in averages if r.get('user_id').get('S') == peloton_id]
-    ride_times = [datetime.fromtimestamp(int(r.get('S')), tz=eastern).strftime('%Y-%m-%d') for r in ride_times]
-    # Why doesn't sort return anything
+    ride_times = [r.get("ride_Id") for r in ride_data]
+    ride_times = [datetime.fromtimestamp(int(r), tz=eastern).strftime('%Y-%m-%d') for r in ride_times]
     ride_times.sort()
     return jsonify(ride_times)
 
@@ -507,22 +510,29 @@ def __get_user_workouts__(user_id):
     return response
 
 
-def __update_user_data():
-    riders = dump_table("peloton_ride_data")
-    distinct_riders = set([r.get('user_id').get('S') for r in riders])
+def __get_user_labels__(user_id):
+    table = dynamodb.Table('peloton_ride_data')
+    response = table.query(
+        IndexName="user_id-index",
+        KeyConditionExpression=Key('user_id').eq(user_id)
+    )
 
-    # Now lets build out that user table
-    table = boto3.resource('dynamodb').Table('peloton_user')
+    return response['Items']
 
-    for rider in distinct_riders:
-        rider_info = [r for r in riders if r.get('user_id').get('S') == rider]
-        workout_ids = [r.get('workout_hash').get('S') for r in rider_info]
-        ride_item = {
-            'user_id': rider,
-            'ride_list': workout_ids
-        }
-        ddb_data = json.loads(json.dumps(ride_item))
-        table.put_item(Item=ddb_data)
+
+def __update_user_data(user_id=None):
+    table = dynamodb.Table('peloton_user')
+    rider_info = table.query(
+        KeyConditionExpression=Key('user_id').eq(user_id)
+    )
+
+    ride_item = {
+        'user_id' : user_id,
+        'ride_list': rider_info['Items'][0].get('ride_list')
+    }
+
+    ddb_data = json.loads(json.dumps(ride_item))
+    table.put_item(Item=ddb_data)
 
 
 def __delete_keys__(user_id: str):
