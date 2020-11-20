@@ -1,6 +1,7 @@
 import boto3
 import flask_login
 import json
+import simplejson
 from boto3.dynamodb.conditions import Key
 from connection.invalid_usage import InvalidUsage
 from jproperties import Properties
@@ -118,24 +119,28 @@ def get_ride_graph(ride_hash=None):
     if ride_hash == 0:
         return jsonify({})
     else:
-        rides = dump_table('peloton_graph_data')
+        table = dynamodb.Table('peloton_graph_data')
+        response = table.query(
+            KeyConditionExpression=Key('workout_hash').eq(ride_hash)
+        )
 
         try:
-            my_ride = [r for r in rides if r.get('workout_hash').get('S') == ride_hash][0]
-        except Exception:
+            my_ride = response['Items'][0]
+        except Exception as e:
+            print(e)
             return jsonify({})
 
         return_obj = {
-            'output': [o.get('N') for o in my_ride.get('metrics').get('M').get('Output').get('L')],
-            'cadence': [o.get('N') for o in my_ride.get('metrics').get('M').get('Cadence').get('L')],
-            'resistance': [r.get('N') for r in my_ride.get('metrics').get('M').get('Resistance').get('L')],
-            'speed': [r.get('N') for r in my_ride.get('metrics').get('M').get('Speed').get('L')],
+            'output': my_ride.get('metrics').get('Output'),
+            'cadence': my_ride.get('metrics').get('Cadence'),
+            'resistance': my_ride.get('metrics').get('Resistance'),
+            'speed': my_ride.get('metrics').get('Speed'),
             'totals': {
-                'calories': my_ride.get('summaries').get('M').get('Calories').get('N'),
-                'distance': my_ride.get('summaries').get('M').get('Distance').get('N'),
-                'total_output': my_ride.get('summaries').get('M').get('Total Output').get('N'),
+                'calories': my_ride.get('Calories'),
+                'distance': my_ride.get('Distance'),
+                'total_output': my_ride.get('Total Output')
             },
-            'seconds_since_start': [s.get('N') for s in my_ride.get('seconds_since_pedaling_start').get('L')]
+            'seconds_since_start': my_ride.get('seconds_since_pedaling_start')
         }
 
         return jsonify(return_obj)
