@@ -292,20 +292,16 @@ def get_course_data(user_id=None):
 
     # Get all the workout hashes for the given user
     user_workouts = __get_user_workouts__(user_id)
-    if user_workouts.get('Item') is None:
+    workout_hash = [w.get('workout_hash') for w in user_workouts]
+
+    if workout_hash is None or len(workout_hash) == 0:
         raise InvalidUsage('Your Peloton Data is missing.  '
                            'Please try re-loading your data from the home page. Please try again', status_code=204)
 
-    if len(user_workouts['Item'].get('ride_list').get('L')) == 0:
-        pull_user_data()
-
-    ride_list = [r.get('S') for r in user_workouts['Item'].get('ride_list').get('L')]
-
     # Cross reference against the course data to bring back minimal record set
-    peloton_ride_data_table = dynamodb.Table('peloton_course_data')
     batch_keys = {
-        peloton_ride_data_table.name: {
-            'Keys': [{'workout_hash': user_hash} for user_hash in ride_list]
+        "peloton_course_data": {
+            'Keys': [{'workout_hash': user_hash} for user_hash in workout_hash]
         }
     }
 
@@ -535,13 +531,21 @@ def dump_table(table_name):
 
 
 def __get_user_workouts__(user_id):
-    response = client.get_item(
-        TableName="peloton_user",
-        Key={
-            'user_id': {'S': user_id}
-        }
+
+    table = dynamodb.Table('peloton_ride_data')
+    response = table.query(
+        IndexName="user_id-index",
+        KeyConditionExpression=Key('user_id').eq(user_id)
     )
-    return response
+
+    return response['Items']
+    # response = client.get_item(
+    #     TableName="peloton_user",
+    #     Key={
+    #         'user_id': {'S': user_id}
+    #     }
+    # )
+    # return response
 
 
 def __get_user_labels__(user_id):
