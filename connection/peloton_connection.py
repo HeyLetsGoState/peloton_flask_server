@@ -1,14 +1,15 @@
 import boto3
+from boto3.dynamodb.conditions import Key
 import hashlib
 import itertools
 import json
 import requests
 import time
 from connection.invalid_usage import InvalidUsage
-
 from decimal import *
 
 client = boto3.client('dynamodb')
+dynamodb = boto3.resource('dynamodb')
 
 
 class PelotonConnection:
@@ -98,17 +99,14 @@ class PelotonConnection:
         TODO: To clear some tech debt start adding the ride_id to the previous entries or find a way to 
         better do this.  I can't be itterating hundreds of rides
         """
-        averages = self.dump_table('peloton_user')
         rides = None
-        # try:
-        #     rides = [f for f in averages if f.get('user_id').get('S') == user_id]
-        #     rides = [r.get('S') for r in rides[0].get('ride_list').get('L')]
-        # except Exception:
-        #     rides = None
+        table = dynamodb.Table('peloton_graph_data')
+        response = table.query(
+            IndexName="user_id-index",
+            KeyConditionExpression=Key('user_id').eq(user_id)
+        )
 
-        graphs = self.dump_table('peloton_graph_data')
-        graphs = [g for g in graphs if g.get('user_id').get('S') == user_id]
-        graphs = [g.get('workout_hash').get('S') for g in graphs]
+        graphs = [g.get('workout_hash') for g in response['Items']]
 
         for workout_id in workout_ids:
 
@@ -265,14 +263,20 @@ class PelotonConnection:
         :param ride_id:
         :return:
         """
-        ride_data = self.dump_table('peloton_ride_data')
+
+        table = dynamodb.Table('peloton_ride_data')
+        response = table.query(
+            IndexName="user_id-index",
+            KeyConditionExpression=Key('user_id').eq(user_id)
+        )
+        ride_data = response['Items']
         ride_history_dict = {}
         try:
-            ride_ids = set([r.get('peloton_id').get('S') for r in ride_data if r.get('user_id').get('S') == user_id])
-            user_rides = [r for r in ride_data if r.get('user_id').get('S') == user_id]
+            ride_ids = [r.get('peloton_id') for r in ride_data]
+            user_rides = [r for r in ride_data]
             for ride in ride_ids:
-                workout_hash = [u.get('workout_hash').get('S') for u in user_rides if u.get('peloton_id').get('S') == ride]
-                __ride__ = [u.get('ride_Id').get('S') for u in user_rides if u.get('peloton_id').get('S') == ride]
+                workout_hash = [u.get('workout_hash') for u in user_rides if u.get('peloton_id') == ride]
+                __ride__ = [u.get('ride_Id') for u in user_rides if u.get('peloton_id') == ride]
                 ride_history_dict[ride] = (workout_hash, __ride__)
         except Exception as e:
             print(e)
