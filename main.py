@@ -2,6 +2,9 @@ import boto3
 import flask_login
 import json
 import simplejson
+from itertools import chain
+from functools import reduce
+import numpy
 from boto3.dynamodb.conditions import Key
 from connection.invalid_usage import InvalidUsage
 from jproperties import Properties
@@ -306,11 +309,21 @@ def get_course_data(user_id=None):
         }
     }
 
-    # Bring back the data && sort it
-    response = dynamodb.batch_get_item(RequestItems=batch_keys)
-    response = [c for c in response.get('Responses').get('peloton_course_data')]
+    total_responses = []
+
+    split_data = numpy.array_split(batch_keys.get('peloton_course_data').get('Keys'), 20)
+    for split in split_data:
+        batch_key = {
+            'peloton_course_data': {
+                 'Keys': split.tolist()
+            }
+        }
+        response = dynamodb.batch_get_item(RequestItems=batch_key)
+        response = [c for c in response.get('Responses').get('peloton_course_data')]
+        total_responses.append(response)
+
+    response = list(chain.from_iterable(total_responses))
     response = sorted(response, key=lambda i: i['created_at'])
-    # course_data = sorted(course_data, key=lambda i: i['created_at'].get('S'))
 
     for course in response:
         return_data[course.get('created_at')] = {
