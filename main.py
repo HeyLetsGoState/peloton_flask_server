@@ -234,19 +234,6 @@ def peloton_login():
     user_id = auth_response.get("user_id")
     cookies = dict(peloton_session_id=session_id)
 
-    table = dynamodb.Table('peloton_user')
-    rider_info = table.query(
-        KeyConditionExpression=Key('user_id').eq(user_id)
-    )
-
-    ride_item = {
-        'user_id' : user_id,
-        'ride_list': rider_info['Items'][0].get('ride_list')
-    }
-
-    ddb_data = json.loads(json.dumps(ride_item))
-    table.put_item(Item=ddb_data)
-
     return {
         'user_id': user_id,
         'cookies': cookies
@@ -539,13 +526,6 @@ def __get_user_workouts__(user_id):
     )
 
     return response['Items']
-    # response = client.get_item(
-    #     TableName="peloton_user",
-    #     Key={
-    #         'user_id': {'S': user_id}
-    #     }
-    # )
-    # return response
 
 
 def __get_user_labels__(user_id):

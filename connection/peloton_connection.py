@@ -101,17 +101,14 @@ class PelotonConnection:
         """
         rides = None
 
-        # Get all the workout hashes for the given user
-        user_workouts = self.__get_user_workouts__(user_id)
-        # rides = [r.get('S') for r in user_workouts['Item'].get('ride_list').get('L')]
-
-        table = dynamodb.Table('peloton_graph_data')
+        table = dynamodb.Table('peloton_ride_data')
         response = table.query(
             IndexName="user_id-index",
             KeyConditionExpression=Key('user_id').eq(user_id)
         )
 
         graphs = [g.get('workout_hash') for g in response['Items']]
+        ride_ids = [g.get('ride_Id') for g in response['Items']]
 
         for workout_id in workout_ids:
 
@@ -140,6 +137,9 @@ class PelotonConnection:
 
             performance_graph_url = f"https://api.onepeloton.com/api/workout/{workout_id}/performance_graph?every_n=5"
             graph = self.get(performance_graph_url, cookies)
+
+            if workout_hash in graphs:
+                continue
 
             if workout_hash not in graphs:
                 graph_data = {
@@ -219,7 +219,15 @@ class PelotonConnection:
             try:
                 heart_rate = heart_rate[0].get("average_value", 0)
             except Exception:
-                heart_rate = 0
+                heart_rate = None
+
+            if heart_rate is None:
+                try:
+                    heart_rate = [f.get('average_value') for f in graph.get('metrics')
+                                  if f.get('display_name') == 'Heart Rate']
+                except Exception:
+                    heart_rate = 0
+
 
             my_json_record = {
                 "Avg Cadence": results.get("Avg Cadence"),
