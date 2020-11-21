@@ -1,9 +1,8 @@
 import boto3
 import flask_login
 import json
-import simplejson
+import asyncio
 from itertools import chain
-from functools import reduce
 import numpy
 from boto3.dynamodb.conditions import Key
 from connection.invalid_usage import InvalidUsage
@@ -84,18 +83,7 @@ def get_user_count():
     }
     return jsonify(resp_obj)
 
-
-@app.route("/pull_user_data", methods=['GET'])
-@login_required
-def pull_user_data():
-    """
-    We store all of our ride information in dynamo by the unique key of the epcoh
-    so yank that out, parse it to a date-time and then sort it and then return it
-    This gets us our labels for the x-axis going from oldest to newest
-    """
-    # Run this daily or set-up a cron to do it for you
-    user_id = session.get('USER_ID', None)
-    cookies = session['COOKIES']
+async def pull_user_data_async(user_id, cookies):
     conn.get_most_recent_ride_details(user_id, cookies, True)
     conn.get_most_recent_ride_info(user_id, cookies, True)
 
@@ -108,6 +96,22 @@ def pull_user_data():
     __update_user_data(user_id)
     __delete_keys__(user_id=user_id)
     return response
+
+user_pull = asyncio.get_event_loop()
+
+
+@app.route("/pull_user_data", methods=['GET'])
+@login_required
+def pull_user_data():
+    """
+    We store all of our ride information in dynamo by the unique key of the epcoh
+    so yank that out, parse it to a date-time and then sort it and then return it
+    This gets us our labels for the x-axis going from oldest to newest
+    """
+    # Run this daily or set-up a cron to do it for you
+    user_id = session.get('USER_ID', None)
+    cookies = session['COOKIES']
+    return user_pull.run_until_complete(pull_user_data_async(user_id, cookies))
 
 
 @app.route("/ride_graph/history/<user_id>/<ride_id>")
