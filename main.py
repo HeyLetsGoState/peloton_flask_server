@@ -283,6 +283,16 @@ def get_course_data(user_id=None):
 
     # Get all the workout hashes for the given user
     user_workouts = __get_user_workouts__(user_id)
+
+    # I'll fix this with some comprehension later
+    hash_id_combo = {}
+    for workout in user_workouts:
+        peloton_id = workout.get('peloton_id')
+        if peloton_id not in hash_id_combo:
+            hash_id_combo[peloton_id] = []
+        hash_id_combo[peloton_id].append(workout.get('workout_hash'))
+
+
     workout_hash = [w.get('workout_hash') for w in user_workouts]
 
     if workout_hash is None or len(workout_hash) == 0:
@@ -312,6 +322,8 @@ def get_course_data(user_id=None):
     response = list(chain.from_iterable(total_responses))
     response = sorted(response, key=lambda i: i['created_at'])
 
+    courses_with_duplicates = [h[1] for h in hash_id_combo.items() if len(h[1]) > 1]
+
     for course in response:
         return_data[course.get('created_at')] = {
             'name': course.get('name'),
@@ -320,7 +332,9 @@ def get_course_data(user_id=None):
             'instructor': course.get('instructor', {}),
             'date': datetime.fromtimestamp((int(course.get('created_at', {}))), tz=eastern).strftime(
                 '%Y-%m-%d'),
-            'workout_hash': course.get('workout_hash')
+            'workout_hash': course.get('workout_hash'),
+            'multiple_rides': course.get('workout_hash') in courses_with_duplicates[0] # I need to fix with comp
+
         }
 
     return jsonify(return_data)
