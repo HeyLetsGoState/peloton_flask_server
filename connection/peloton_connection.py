@@ -251,9 +251,7 @@ class PelotonConnection:
 
             try:
                 if save is True:
-                    return_obj = table.put_item(Item=ddb_data)
-                    print(return_obj)
-                    print()
+                    table.put_item(Item=ddb_data)
             except Exception as e:
                 print(e)
 
