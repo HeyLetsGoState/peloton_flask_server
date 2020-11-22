@@ -1,20 +1,22 @@
+import asyncio
+import json
+import os
+from datetime import datetime
+from itertools import chain
+
 import boto3
 import flask_login
-import json
-import asyncio
-from itertools import chain
 import numpy
 from boto3.dynamodb.conditions import Key
-from connection.invalid_usage import InvalidUsage
-from jproperties import Properties
-from flask_cors import CORS
-from datetime import datetime
-from pytz import timezone
-from connection.peloton_connection import PelotonConnection
 from flask import Flask, jsonify, request, Response, session, redirect, make_response
-from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
 from flask_caching import Cache
+from flask_cors import CORS
+from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
+from jproperties import Properties
+from pytz import timezone
 
+from connection.invalid_usage import InvalidUsage
+from connection.peloton_connection import PelotonConnection
 
 app = Flask(__name__)
 app.config.from_object(__name__)
@@ -22,14 +24,16 @@ app.config.update(SECRET_KEY="1234567")
 conn = PelotonConnection()
 dynamodb = boto3.resource('dynamodb')
 
+REDIS_URL = os.environ.get('REDIS_URL')
+
 try:
     """
     In a local environment you can't use redis (well you could by why would you)
     And for now I won't either until I can figure out the key issue.
     """
-    cache = Cache(config={'CACHE_TYPE': 'simple'})
+    cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 except Exception:
-    cache = Cache(config={'CACHE_TYPE': 'simple'})
+    cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': REDIS_URL})
 
 cache.init_app(app)
 
@@ -43,7 +47,6 @@ eastern = timezone('US/Eastern')
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
-
 
 '''
 Create my User Model
@@ -79,9 +82,10 @@ def ping():
 def get_user_count():
     total_users = dump_table('peloton_user')
     resp_obj = {
-        'total_users' : len(total_users)
+        'total_users': len(total_users)
     }
     return jsonify(resp_obj)
+
 
 async def pull_user_data_async(user_id, cookies):
     conn.get_most_recent_ride_details(user_id, cookies, True)
@@ -96,6 +100,7 @@ async def pull_user_data_async(user_id, cookies):
     __update_user_data(user_id)
     __delete_keys__(user_id=user_id)
     return response
+
 
 user_pull = asyncio.get_event_loop()
 
@@ -170,12 +175,13 @@ def get_labels(user_id=None):
 @app.route("/get_ride_charts/<user_id>")
 @cache.cached(timeout=3600, query_string=True)
 def get_ride_charts(user_id=None):
-
     averages = dump_table('peloton_ride_data')
     peloton_id = user_id if user_id is not None else default_user_id
 
-    rides_with_hash = [(r.get('ride_Id').get('S'), r.get('workout_hash').get('S')) for r in averages if r.get('user_id').get('S') == peloton_id]
-    rides_with_hash = [((datetime.fromtimestamp(int(r[0]), tz=eastern).strftime('%Y-%m-%d')), r[1]) for r in rides_with_hash]
+    rides_with_hash = [(r.get('ride_Id').get('S'), r.get('workout_hash').get('S')) for r in averages if
+                       r.get('user_id').get('S') == peloton_id]
+    rides_with_hash = [((datetime.fromtimestamp(int(r[0]), tz=eastern).strftime('%Y-%m-%d')), r[1]) for r in
+                       rides_with_hash]
 
     """
     Why doesn't sort return anything?  Because it doesn't feel like it 
@@ -200,7 +206,6 @@ def get_heart_rate(user_id=None):
     heart_rate = [f.get('Avg Output', {}).get('M', {}).get('heart_rate', {}).get('N', 0) for f in data]
     heart_rate = [int(h) if h is not None else 0 for h in heart_rate]
     return jsonify(heart_rate)
-
 
 
 @app.route("/get_charts/<user_id>", methods=['GET'])
@@ -258,7 +263,7 @@ def get_user_rollup(user_id=None):
     averages = [a for a in averages if a.get('user_id').get('S') == user_id]
     averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
     total_rides = len(averages)
-    miles_ridden = sum([float(r.get('Avg Cadence').get('M', {}).get('miles_ridden',{}).get('N', 0)) for r in averages])
+    miles_ridden = sum([float(r.get('Avg Cadence').get('M', {}).get('miles_ridden', {}).get('N', 0)) for r in averages])
     total_achievements = None
     try:
         total_achievements = averages[-1].get('total_achievements').get('N')
@@ -292,7 +297,6 @@ def get_course_data(user_id=None):
             hash_id_combo[peloton_id] = []
         hash_id_combo[peloton_id].append(workout.get('workout_hash'))
 
-
     workout_hash = [w.get('workout_hash') for w in user_workouts]
 
     if workout_hash is None or len(workout_hash) == 0:
@@ -312,7 +316,7 @@ def get_course_data(user_id=None):
     for split in split_data:
         batch_key = {
             'peloton_course_data': {
-                 'Keys': split.tolist()
+                'Keys': split.tolist()
             }
         }
         response = dynamodb.batch_get_item(RequestItems=batch_key)
@@ -333,7 +337,7 @@ def get_course_data(user_id=None):
             'date': datetime.fromtimestamp((int(course.get('created_at', {}))), tz=eastern).strftime(
                 '%Y-%m-%d'),
             'workout_hash': course.get('workout_hash'),
-            'multiple_rides': course.get('workout_hash') in courses_with_duplicates[0] # I need to fix with comp
+            'multiple_rides': course.get('workout_hash') in courses_with_duplicates[0]  # I need to fix with comp
 
         }
 
@@ -343,7 +347,6 @@ def get_course_data(user_id=None):
 @app.route("/music_by_time/<ride_time>")
 @cache.cached(timeout=3600, query_string=True)
 def get_music_by_time(ride_time=None):
-
     music = dump_table('peloton_music_sets')
 
     # TODO - Get a utility class to dump these S's and L's' and the rest from Dynamo
@@ -536,7 +539,6 @@ def dump_table(table_name):
 
 
 def __get_user_workouts__(user_id):
-
     table = dynamodb.Table('peloton_ride_data')
     response = table.query(
         IndexName="user_id-index",
@@ -563,7 +565,7 @@ def __update_user_data(user_id=None):
     )
 
     ride_item = {
-        'user_id' : user_id,
+        'user_id': user_id,
         'ride_list': rider_info['Items'][0].get('ride_list')
     }
 
