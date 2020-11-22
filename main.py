@@ -31,9 +31,9 @@ try:
     In a local environment you can't use redis (well you could by why would you)
     And for now I won't either until I can figure out the key issue.
     """
-    cache = Cache(app, config={'CACHE_TYPE': 'simple'})
-except Exception:
     cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': REDIS_URL})
+except Exception:
+    cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
 cache.init_app(app)
 
