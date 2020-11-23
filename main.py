@@ -337,8 +337,7 @@ def get_course_data(user_id=None):
             'date': datetime.fromtimestamp((int(course.get('created_at', {}))), tz=eastern).strftime(
                 '%Y-%m-%d'),
             'workout_hash': course.get('workout_hash'),
-            'multiple_rides': course.get('workout_hash') in courses_with_duplicates[0]  # I need to fix with comp
-
+            'multiple_rides': course.get('workout_hash', []) in courses_with_duplicates.get(0, [])  # I need to fix with comp
         }
 
     return jsonify(return_data)
