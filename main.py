@@ -329,6 +329,10 @@ def get_course_data(user_id=None):
     courses_with_duplicates = [h[1] for h in hash_id_combo.items() if len(h[1]) > 1]
 
     for course in response:
+        try:
+            multiple_rides = course.get('workout_hash') in courses_with_duplicates[0]  # I need to fix with comp
+        except Exception as e:
+            multiple_rides = []
         return_data[course.get('created_at')] = {
             'name': course.get('name'),
             'difficulty': course.get('difficulty'),
@@ -337,7 +341,7 @@ def get_course_data(user_id=None):
             'date': datetime.fromtimestamp((int(course.get('created_at', {}))), tz=eastern).strftime(
                 '%Y-%m-%d'),
             'workout_hash': course.get('workout_hash'),
-            'multiple_rides': course.get('workout_hash', []) in courses_with_duplicates.get(0, [])  # I need to fix with comp
+            'multiple_rides': multiple_rides
         }
 
     return jsonify(return_data)
