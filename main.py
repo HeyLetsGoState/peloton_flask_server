@@ -428,6 +428,9 @@ def login():
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <div class="card">
+                    <p>To continue, enter your credentials and click sign-in.  Please be aware that if this is your first time
+                    pulling all of your data, there will be a bit of a wait.  This is OK and to be expected.  Also,
+                    if you have found value in this free service, please tell others in the community to help this site grow</p>
                     <div class="card-body">
                         <form action="" method="post"">
                             <div class="form-group row">
