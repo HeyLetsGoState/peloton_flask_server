@@ -94,7 +94,7 @@ async def pull_user_data_async(user_id, cookies):
     if user_id is None:
         raise InvalidUsage('Your peloton credentials were invalid.  Please verify and try again', status_code=401)
 
-    response = make_response(redirect("http://pelodashboard.com"))
+    response = make_response(redirect("https://pelodashboard.com"))
     response.set_cookie('USER_ID', user_id)
 
     __update_user_data(user_id)
@@ -391,7 +391,7 @@ def login():
         if user_id is None:
             raise InvalidUsage('Your Peloton Credentials were invalid.  Please try again', status_code=401)
 
-        response = make_response(redirect("http://pelodashboard.com"))
+        response = make_response(redirect("https://pelodashboard.com"))
         response.set_cookie('USER_ID', user_id)
         return response
     else:
@@ -429,7 +429,7 @@ def login():
             <div class="col-md-8">
                 <div class="card">
                     <p>To continue, enter your credentials and click sign-in.  Please be aware that if this is your first time
-                    pulling all of your data, there will be a bit of a wait.  This is OK and to be expected.  Also,
+                    pulling all of your data, there will be a bit of a wait.  This is OK and to be expected.  Also,m
                     if you have found value in this free service, please tell others in the community to help this site grow</p>
                     <div class="card-body">
                         <form action="" method="post"">
