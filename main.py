@@ -22,19 +22,21 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 app.config.update(SECRET_KEY="1234567")
 conn = PelotonConnection()
-dynamodb = boto3.resource('dynamodb')
 
+dynamodb = boto3.resource('dynamodb')
 REDIS_URL = os.environ.get('REDIS_URL')
 
-try:
-    """
-    In a local environment you can't use redis (well you could by why would you)
-    And for now I won't either until I can figure out the key issue.
-    """
-    cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': REDIS_URL})
-except Exception:
-    cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+# try:
+#     """
+#     In a local environment you can't use redis (well you could by why would you)
+#     And for now I won't either until I can figure out the key issue.
+#     """
+#     cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': REDIS_URL})
+# except Exception:
+#     cache = Cache(app, config={'CACHE_TYPE': 'simple'})
+#
 
+cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 cache.init_app(app)
 
 # CORS Set-up here and at the bottom
