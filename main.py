@@ -24,20 +24,13 @@ app.config.update(SECRET_KEY="1234567")
 conn = PelotonConnection()
 
 dynamodb = boto3.resource('dynamodb')
-REDIS_URL = os.environ.get('REDIS_URL')
 
-# try:
-#     """
-#     In a local environment you can't use redis (well you could by why would you)
-#     And for now I won't either until I can figure out the key issue.
-#     """
-#     cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_URL': REDIS_URL})
-# except Exception:
-#     cache = Cache(app, config={'CACHE_TYPE': 'simple'})
-#
+# define the cache config keys, remember that it can be done in a settings file
+app.config['CACHE_TYPE'] = 'redis'
+app.config['CACHE_REDIS_URL'] = 'redis://pelton-cache.mr1y5c.ng.0001.use1.cache.amazonaws.com:6379'
 
-cache = Cache(app, config={'CACHE_TYPE': 'simple'})
-cache.init_app(app)
+# register the cache instance and binds it on to your app
+app.cache = Cache(app)
 
 # CORS Set-up here and at the bottom
 CORS(app, resources={r'/*': {'origins': '*', 'allowedHeaders': ['Content-Type']}})
@@ -81,6 +74,7 @@ def ping():
 
 
 @app.route('/get_total_users', methods=['GET'])
+@app.cache.cached(timeout=86400)
 def get_user_count():
     total_users = dump_table('peloton_user')
     resp_obj = {
@@ -122,13 +116,13 @@ def pull_user_data():
 
 
 @app.route("/ride_graph/history/<user_id>/<ride_id>")
-@cache.cached(timeout=3600, query_string=True)
+@app.cache.cached(timeout=86400, query_string=True)
 def get_ride_history(user_id=None, ride_id=None):
     return jsonify(conn.get_ride_history(user_id, ride_id))
 
 
 @app.route("/ride_graph/<ride_hash>")
-@cache.cached(timeout=3600, query_string=True)
+@app.cache.cached(timeout=86400, query_string=True)
 def get_ride_graph(ride_hash=None):
     if ride_hash == 0:
         return jsonify({})
@@ -161,7 +155,7 @@ def get_ride_graph(ride_hash=None):
 
 
 @app.route("/get_labels/<user_id>")
-@cache.cached(timeout=3600, query_string=True)
+@app.cache.cached(timeout=86400, query_string=True)
 def get_labels(user_id=None):
     if user_id is None:
         user_id = default_user_id
@@ -175,7 +169,7 @@ def get_labels(user_id=None):
 
 
 @app.route("/get_ride_charts/<user_id>")
-@cache.cached(timeout=3600, query_string=True)
+@app.cache.cached(timeout=86400, query_string=True)
 def get_ride_charts(user_id=None):
     averages = dump_table('peloton_ride_data')
     peloton_id = user_id if user_id is not None else default_user_id
@@ -193,7 +187,7 @@ def get_ride_charts(user_id=None):
 
 
 @app.route("/get_heart_rate/<user_id>", methods=['GET'])
-@cache.cached(timeout=3600, query_string=True)
+@app.cache.cached(timeout=86400, query_string=True)
 def get_heart_rate(user_id=None):
     """
     Felt that grabbing the heart-rate info on it's own return was useful for the one-off Heart Rate Chart
@@ -211,7 +205,7 @@ def get_heart_rate(user_id=None):
 
 
 @app.route("/get_charts/<user_id>", methods=['GET'])
-@cache.cached(timeout=3600, query_string=True)
+@app.cache.cached(timeout=86400, query_string=True)
 def get_charts(user_id=None):
     """
     Generate the chart data for the average outputs of Output/Cadence/Resistance/Speed/Miles
@@ -252,14 +246,14 @@ def peloton_login():
 
 
 @app.route("/achievements/<user_id>", methods=['GET'])
-@cache.cached(timeout=3600, query_string=True)
+@app.cache.cached(timeout=86400, query_string=True)
 def get_achievements(user_id=None):
     user_id = session.get('USER_ID', None)
     return jsonify(conn.get_achievements(user_id))
 
 
 @app.route("/get_user_rollup/<user_id>", methods=['GET'])
-@cache.cached(timeout=3600, query_string=True)
+@app.cache.cached(timeout=86400, query_string=True)
 def get_user_rollup(user_id=None):
     averages = dump_table('peloton_ride_data')
     averages = [a for a in averages if a.get('user_id').get('S') == user_id]
@@ -280,7 +274,7 @@ def get_user_rollup(user_id=None):
 
 
 @app.route("/course_data/<user_id>")
-@cache.cached(timeout=3600, query_string=True)
+@app.cache.cached(timeout=86400, query_string=True)
 def get_course_data(user_id=None):
     """
     Pull back course data information to display in a table
@@ -350,7 +344,7 @@ def get_course_data(user_id=None):
 
 
 @app.route("/music_by_time/<ride_time>")
-@cache.cached(timeout=3600, query_string=True)
+@app.cache.cached(timeout=86400, query_string=True)
 def get_music_by_time(ride_time=None):
     music = dump_table('peloton_music_sets')
 
@@ -494,7 +488,7 @@ def logout():
 
 
 @app.route('/totals', methods=['GET'])
-@cache.cached(timeout=60, query_string=True)
+@app.cache.cached(timeout=86400, query_string=True)
 def get_total_rides():
     total_rides = dump_table('peloton_ride_data')
     total_users = dump_table('peloton_user')
@@ -583,7 +577,7 @@ def __update_user_data(user_id=None):
 
 def __delete_keys__(user_id: str):
     with app.app_context():
-        cache.clear()
+        app.cache.clear()
     """
     # This should speed up the caching a bit and let this thing scale a bit easier.
     # One day I'll quit being cheap and move off the t2.micro
