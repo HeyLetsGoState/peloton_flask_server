@@ -282,6 +282,7 @@ def get_course_data(user_id=None):
     dynamodb = boto3.resource('dynamodb')
     return_data = {}
 
+    ride_data = __get_peloton_graph_data__(user_id)
     # Get all the workout hashes for the given user
     user_workouts = __get_user_workouts__(user_id)
 
@@ -333,6 +334,8 @@ def get_course_data(user_id=None):
             'name': course.get('name'),
             'difficulty': course.get('difficulty'),
             'length': course.get('length'),
+            'miles_ridden': str([u for u in user_workouts if u['workout_hash'] ==  course['workout_hash']][0]['miles_ridden']),
+            'total_output': str([r for r in ride_data if r['workout_hash'] == course['workout_hash']][0]['summaries']['Total Output']),
             'instructor': course.get('instructor', {}),
             'date': datetime.fromtimestamp((int(course.get('created_at', {}))), tz=eastern).strftime(
                 '%Y-%m-%d'),
@@ -539,6 +542,14 @@ def dump_table(table_name):
             break
     return results
 
+def __get_peloton_graph_data__(user_id):
+    table = dynamodb.Table('peloton_graph_data')
+    response = table.query(
+        IndexName="user_id-index",
+        KeyConditionExpression=Key('user_id').eq(user_id)
+    )
+
+    return response['Items']
 
 def __get_user_workouts__(user_id):
     table = dynamodb.Table('peloton_ride_data')
