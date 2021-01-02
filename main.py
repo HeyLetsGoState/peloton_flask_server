@@ -26,8 +26,8 @@ conn = PelotonConnection()
 dynamodb = boto3.resource('dynamodb')
 
 # define the cache config keys, remember that it can be done in a settings file
-app.config['CACHE_TYPE'] = 'simple'
-app.config['CACHE_REDIS_URL'] = 'redis://pelton-cache.mr1y5c.ng.0001.use1.cache.amazonaws.com:6379'
+app.config['CACHE_TYPE'] = 'memcached'
+#app.config['CACHE_REDIS_URL'] = 'redis://pelton-cache.mr1y5c.ng.0001.use1.cache.amazonaws.com:6379'
 
 # register the cache instance and binds it on to your app
 app.cache = Cache(app)
