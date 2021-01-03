@@ -330,12 +330,18 @@ def get_course_data(user_id=None):
             multiple_rides = course.get('workout_hash') in courses_with_duplicates[0]  # I need to fix with comp
         except Exception as e:
             multiple_rides = []
+
+        try:
+            total_output = str([r for r in ride_data if r['workout_hash'] == course['workout_hash']][0]['summaries']['Total Output'])
+        except Exception as e:
+            total_output = 0
+
         return_data[course.get('created_at')] = {
             'name': course.get('name'),
             'difficulty': course.get('difficulty'),
             'length': course.get('length'),
             'miles_ridden': str([u for u in user_workouts if u['workout_hash'] ==  course['workout_hash']][0]['miles_ridden']),
-            'total_output': str([r for r in ride_data if r['workout_hash'] == course['workout_hash']][0]['summaries']['Total Output']),
+            'total_output': str(total_output),
             'instructor': course.get('instructor', {}),
             'date': datetime.fromtimestamp((int(course.get('created_at', {}))), tz=eastern).strftime(
                 '%Y-%m-%d'),
