@@ -8,7 +8,7 @@ import boto3
 import flask_login
 import numpy
 from boto3.dynamodb.conditions import Key
-from flask import Flask, jsonify, request, Response, session, redirect, make_response
+from quart import Quart, jsonify, request, Response, session, redirect, make_response
 from flask_caching import Cache
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
@@ -18,7 +18,7 @@ from pytz import timezone
 from connection.invalid_usage import InvalidUsage
 from connection.peloton_connection import PelotonConnection
 
-app = Flask(__name__)
+app = Quart(__name__)
 app.config.from_object(__name__)
 app.config.update(SECRET_KEY="1234567")
 conn = PelotonConnection()
@@ -26,7 +26,7 @@ conn = PelotonConnection()
 dynamodb = boto3.resource('dynamodb')
 
 # define the cache config keys, remember that it can be done in a settings file
-app.config['CACHE_TYPE'] = 'simple'
+app.config['CACHE_TYPE'] = 'memcached'
 app.config['CACHE_REDIS_URL'] = 'redis://pelton-cache.mr1y5c.ng.0001.use1.cache.amazonaws.com:6379'
 
 # register the cache instance and binds it on to your app
