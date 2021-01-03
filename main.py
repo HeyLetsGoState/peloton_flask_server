@@ -54,6 +54,7 @@ with open("peloton.properties", "rb") as f:
 default_user_id = p["USER_ID"].data
 
 
+
 class User(UserMixin):
     def __init__(self, id):
         self.id = id
@@ -114,15 +115,15 @@ def pull_user_data():
     cookies = session['COOKIES']
     return user_pull.run_until_complete(pull_user_data_async(user_id, cookies))
 
-
+# @cache.memoize()
 @app.route("/ride_graph/history/<user_id>/<ride_id>")
-@app.cache.cached(timeout=86400, query_string=True)
+@app.cache.memoize(timeout=3600)
 def get_ride_history(user_id=None, ride_id=None):
     return jsonify(conn.get_ride_history(user_id, ride_id))
 
 
 @app.route("/ride_graph/<ride_hash>")
-@app.cache.cached(timeout=86400, query_string=True)
+@app.cache.memoize(timeout=86400)
 def get_ride_graph(ride_hash=None):
     if ride_hash == 0:
         return jsonify({})
@@ -155,7 +156,7 @@ def get_ride_graph(ride_hash=None):
 
 
 @app.route("/get_labels/<user_id>")
-@app.cache.cached(timeout=86400, query_string=True)
+@app.cache.memoize(timeout=86400)
 def get_labels(user_id=None):
     if user_id is None:
         user_id = default_user_id
@@ -169,13 +170,14 @@ def get_labels(user_id=None):
 
 
 @app.route("/get_ride_charts/<user_id>")
-@app.cache.cached(timeout=86400, query_string=True)
+@app.cache.memoize(timeout=86400)
 def get_ride_charts(user_id=None):
-    averages = dump_table('peloton_ride_data')
-    peloton_id = user_id if user_id is not None else default_user_id
 
-    rides_with_hash = [(r.get('ride_Id').get('S'), r.get('workout_hash').get('S')) for r in averages if
-                       r.get('user_id').get('S') == peloton_id]
+    peloton_id = user_id if user_id is not None else default_user_id
+    averages = __get_user_workouts__(peloton_id)
+
+    rides_with_hash = [(r.get('ride_Id'), r.get('workout_hash')) for r in averages if
+                       r.get('user_id') == peloton_id]
     rides_with_hash = [((datetime.fromtimestamp(int(r[0]), tz=eastern).strftime('%Y-%m-%d')), r[1]) for r in
                        rides_with_hash]
 
@@ -187,7 +189,7 @@ def get_ride_charts(user_id=None):
 
 
 @app.route("/get_heart_rate/<user_id>", methods=['GET'])
-@app.cache.cached(timeout=86400, query_string=True)
+@app.cache.memoize(timeout=86400)
 def get_heart_rate(user_id=None):
     """
     Felt that grabbing the heart-rate info on it's own return was useful for the one-off Heart Rate Chart
@@ -195,32 +197,30 @@ def get_heart_rate(user_id=None):
     peloton_id = user_id if user_id is not None else default_user_id
 
     # Grab and sort data
-    data = dump_table('peloton_ride_data')
-    data = [d for d in data if d.get('user_id').get('S') == peloton_id]
-    data = sorted(data, key=lambda i: i['ride_Id'].get('S'))
+    data = __get_user_workouts__(peloton_id)
+    data = sorted(data, key=lambda i: i['ride_Id'])
 
-    heart_rate = [f.get('Avg Output', {}).get('M', {}).get('heart_rate', {}).get('N', 0) for f in data]
+    heart_rate = [f.get('Avg Output').get('heart_rate') for f in data]
     heart_rate = [int(h) if h is not None else 0 for h in heart_rate]
     return jsonify(heart_rate)
 
 
 @app.route("/get_charts/<user_id>", methods=['GET'])
-@app.cache.cached(timeout=86400, query_string=True)
+@app.cache.memoize(timeout=86400)
 def get_charts(user_id=None):
     """
     Generate the chart data for the average outputs of Output/Cadence/Resistance/Speed/Miles
     """
     peloton_id = user_id if user_id is not None else default_user_id
 
-    averages = dump_table('peloton_ride_data')
-    averages = [a for a in averages if a.get('user_id').get('S') == peloton_id]
+    averages = __get_user_workouts__(peloton_id)
 
-    averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
-    average_output = [f.get("Avg Output", {}).get('M', {}).get("value", {}).get('N', 0) for f in averages]
-    average_cadence = [f.get("Avg Cadence", {}).get('M', {}).get("value", {}).get('N', 0) for f in averages]
-    average_resistance = [f.get("Avg Resistance", {}).get('M', {}).get("value", {}).get('N', 0) for f in averages]
-    average_speed = [f.get("Avg Speed", {}).get('M', {}).get("value", {}).get('N', 0) for f in averages]
-    miles_per_ride = [f.get("Avg Output", {}).get('M', {}).get("miles_ridden", {}).get('N', 0) for f in averages]
+    averages = sorted(averages, key=lambda i: i['ride_Id'])
+    average_output = [f.get("Avg Output", {}).get("value", {}) for f in averages]
+    average_cadence = [f.get("Avg Cadence", {}).get("value", {}) for f in averages]
+    average_resistance = [f.get("Avg Resistance", {}).get("value", {}) for f in averages]
+    average_speed = [f.get("Avg Speed", {}).get("value", {}) for f in averages]
+    miles_per_ride = [f.get("Avg Output", {}).get("miles_ridden", {}) for f in averages]
 
     datasets = [average_output, average_cadence, average_resistance, average_speed, miles_per_ride]
     return jsonify(datasets)
@@ -246,14 +246,14 @@ def peloton_login():
 
 
 @app.route("/achievements/<user_id>", methods=['GET'])
-@app.cache.cached(timeout=86400, query_string=True)
+@app.cache.memoize(timeout=86400)
 def get_achievements(user_id=None):
     user_id = session.get('USER_ID', None)
     return jsonify(conn.get_achievements(user_id))
 
 
 @app.route("/get_user_rollup/<user_id>", methods=['GET'])
-@app.cache.cached(timeout=86400, query_string=True)
+@app.cache.memoize(timeout=86400)
 def get_user_rollup(user_id=None):
     averages = dump_table('peloton_ride_data')
     averages = [a for a in averages if a.get('user_id').get('S') == user_id]
@@ -274,7 +274,7 @@ def get_user_rollup(user_id=None):
 
 
 @app.route("/course_data/<user_id>")
-@app.cache.cached(timeout=86400, query_string=True)
+@app.cache.memoize(timeout=86400)
 def get_course_data(user_id=None):
     """
     Pull back course data information to display in a table
@@ -347,7 +347,7 @@ def get_course_data(user_id=None):
 
 
 @app.route("/music_by_time/<ride_time>")
-@app.cache.cached(timeout=86400, query_string=True)
+@app.cache.memoize(timeout=86400)
 def get_music_by_time(ride_time=None):
     music = dump_table('peloton_music_sets')
 
@@ -491,7 +491,7 @@ def logout():
 
 
 @app.route('/totals', methods=['GET'])
-@app.cache.cached(timeout=86400, query_string=True)
+@app.cache.memoize(timeout=86400)
 def get_total_rides():
     total_rides = dump_table('peloton_ride_data')
     total_users = dump_table('peloton_user')
@@ -542,6 +542,7 @@ def dump_table(table_name):
             break
     return results
 
+
 def __get_peloton_graph_data__(user_id):
     table = dynamodb.Table('peloton_graph_data')
     response = table.query(
@@ -550,6 +551,7 @@ def __get_peloton_graph_data__(user_id):
     )
 
     return response['Items']
+
 
 def __get_user_workouts__(user_id):
     table = dynamodb.Table('peloton_ride_data')
@@ -588,12 +590,20 @@ def __update_user_data(user_id=None):
 
 def __delete_keys__(user_id: str):
     with app.app_context():
-        app.cache.clear()
-    """
-    # This should speed up the caching a bit and let this thing scale a bit easier.
-    # One day I'll quit being cheap and move off the t2.micro
-    # :param user_id:  the person to clear out
-    # :return:
+        if user_id is None:
+            return
+        app.cache.delete_memoized(get_user_rollup, user_id)
+        app.cache.delete_memoized(get_course_data, user_id)
+        app.cache.delete_memoized(get_user_rollup, user_id)
+        app.cache.delete_memoized(get_charts, user_id)
+        app.cache.delete_memoized(get_heart_rate, user_id)
+        app.cache.delete_memoized(get_ride_charts, user_id)
+        # app.cache.clear()
+    # """
+    # # This should speed up the caching a bit and let this thing scale a bit easier.
+    # # One day I'll quit being cheap and move off the t2.micro
+    # # :param user_id:  the person to clear out
+    # # :return:
     # """
     #
     # if user_id is None:
