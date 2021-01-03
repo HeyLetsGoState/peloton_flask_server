@@ -200,7 +200,11 @@ def get_heart_rate(user_id=None):
     data = __get_user_workouts__(peloton_id)
     data = sorted(data, key=lambda i: i['ride_Id'])
 
-    heart_rate = [f.get('Avg Output').get('heart_rate') for f in data]
+    for index in range(len(data)):
+        if data[index]['Avg Output'] is None:
+            data[index]['Avg Output'] = {}
+
+    heart_rate = [f.get('Avg Output', {}).get('heart_rate', 0) for f in data]
     heart_rate = [int(h) if h is not None else 0 for h in heart_rate]
     return jsonify(heart_rate)
 
@@ -216,6 +220,19 @@ def get_charts(user_id=None):
     averages = __get_user_workouts__(peloton_id)
 
     averages = sorted(averages, key=lambda i: i['ride_Id'])
+
+    for index in range(len(averages)):
+        if averages[index]['Avg Output'] is None:
+            averages[index]['Avg Output'] = {}
+        if averages[index]['Avg Cadence'] is None:
+            averages[index]['Avg Cadence'] = {}
+        if averages[index]['Avg Resistance'] is None:
+            averages[index]['Avg Resistance'] = {}
+        if averages[index]['Avg Speed'] is None:
+            averages[index]['Avg Speed'] = {}
+        if averages[index]['Avg Output'] is None:
+            averages[index]['Avg Output'] = {}
+
     average_output = [f.get("Avg Output", {}).get("value", {}) for f in averages]
     average_cadence = [f.get("Avg Cadence", {}).get("value", {}) for f in averages]
     average_resistance = [f.get("Avg Resistance", {}).get("value", {}) for f in averages]
