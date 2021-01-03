@@ -8,7 +8,7 @@ import boto3
 import flask_login
 import numpy
 from boto3.dynamodb.conditions import Key
-from flask import Flask, jsonify, request, Response, session, redirect, make_response
+from quart import Quart, jsonify, request, Response, session, redirect, make_response
 from flask_caching import Cache
 from flask_cors import CORS
 from flask_login import LoginManager, UserMixin, login_required, login_user, logout_user
@@ -18,7 +18,7 @@ from pytz import timezone
 from connection.invalid_usage import InvalidUsage
 from connection.peloton_connection import PelotonConnection
 
-app = Flask(__name__)
+app = Quart(__name__)
 app.config.from_object(__name__)
 app.config.update(SECRET_KEY="1234567")
 conn = PelotonConnection()
