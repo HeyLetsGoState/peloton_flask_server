@@ -70,8 +70,8 @@ class PelotonConnection:
             workout_results.append(my_workouts)
 
         final_results = list(itertools.chain([w.get('data') for w in workout_results]))
-        workout_results = [y for x in final_results for y in x]
         try:
+            workout_results = [y for x in final_results for y in x]
             workout_results = [w for w in workout_results if w.get('fitness_discipline') == 'cycling'
                                or w.get('metrics_type') == 'cycling']
 
