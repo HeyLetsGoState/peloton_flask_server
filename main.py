@@ -27,6 +27,7 @@ dynamodb = boto3.resource('dynamodb')
 
 # define the cache config keys, remember that it can be done in a settings file
 app.config['CACHE_TYPE'] = 'memcached'
+
 app.config['CACHE_REDIS_URL'] = 'redis://pelton-cache.mr1y5c.ng.0001.use1.cache.amazonaws.com:6379'
 
 # register the cache instance and binds it on to your app
@@ -75,7 +76,7 @@ def ping():
 
 
 @app.route('/get_total_users', methods=['GET'])
-@app.cache.cached(timeout=86400)
+@app.cache.memoize(timeout=86400)
 def get_user_count():
     total_users = dump_table('peloton_user')
     resp_obj = {
@@ -621,6 +622,7 @@ def __delete_keys__(user_id: str):
         app.cache.delete_memoized(get_charts, user_id)
         app.cache.delete_memoized(get_heart_rate, user_id)
         app.cache.delete_memoized(get_ride_charts, user_id)
+        app.cache.delete_memoized(get_user_count)
         # app.cache.clear()
     # """
     # # This should speed up the caching a bit and let this thing scale a bit easier.
