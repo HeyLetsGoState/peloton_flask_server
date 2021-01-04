@@ -116,9 +116,9 @@ def pull_user_data():
     cookies = session['COOKIES']
     return user_pull.run_until_complete(pull_user_data_async(user_id, cookies))
 
-# @cache.memoize()
+
 @app.route("/ride_graph/history/<user_id>/<ride_id>")
-@app.cache.memoize(timeout=3600)
+@app.cache.memoize(timeout=86400)
 def get_ride_history(user_id=None, ride_id=None):
     return jsonify(conn.get_ride_history(user_id, ride_id))
 
@@ -623,6 +623,7 @@ def __delete_keys__(user_id: str):
         app.cache.delete_memoized(get_heart_rate, user_id)
         app.cache.delete_memoized(get_ride_charts, user_id)
         app.cache.delete_memoized(get_user_count)
+        app.cache.delete_memoized(get_total_rides)
         # app.cache.clear()
     # """
     # # This should speed up the caching a bit and let this thing scale a bit easier.
