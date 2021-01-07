@@ -116,6 +116,8 @@ class PelotonConnection:
             # Get the workout info
             workout = self.get(workout_url, cookies)
             created_at = workout.get("created_at")
+            if str(created_at) in ride_ids:
+                continue
 
             d = {
                 'created_at': created_at,
@@ -313,11 +315,11 @@ class PelotonConnection:
         TODO: To clear some tech debt start adding the ride_id to the previous entries or find a way to 
         better do this.  I can't be itterating hundreds of rides
         """
-        averages = self.dump_table('peloton_user')
+        averages = self.__get_user_workouts_by_key__(user_id)
         rides = None
         try:
-             rides = [f for f in averages if f.get('user_id').get('S') == user_id]
-             rides = [r.get('S') for r in rides[0].get('ride_list').get('L')]
+             rides = [f for f in averages]
+             rides = [r for r in rides[0].get('ride_list')]
         except Exception:
              rides = None
 
@@ -428,3 +430,16 @@ class PelotonConnection:
             }
         )
         return response
+
+    @staticmethod
+    def __get_user_workouts_by_key__(user_id=None):
+        table = dynamodb.Table('peloton_user')
+        response = table.query(
+            IndexName="user_id-index",
+            KeyConditionExpression=Key('user_id').eq(user_id)
+        )
+
+        return response['Items']
+
+
+

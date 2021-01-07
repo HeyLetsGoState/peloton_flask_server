@@ -273,14 +273,14 @@ def get_achievements(user_id=None):
 @app.route("/get_user_rollup/<user_id>", methods=['GET'])
 @app.cache.memoize(timeout=86400)
 def get_user_rollup(user_id=None):
-    averages = dump_table('peloton_ride_data')
-    averages = [a for a in averages if a.get('user_id').get('S') == user_id]
-    averages = sorted(averages, key=lambda i: i['ride_Id'].get('S'))
+
+    averages = __get_user_workouts__(user_id)
+    averages = sorted(averages, key=lambda i: i['ride_Id'])
     total_rides = len(averages)
-    miles_ridden = sum([float(r.get('Avg Cadence').get('M', {}).get('miles_ridden', {}).get('N', 0)) for r in averages])
+    miles_ridden = sum([float(r.get('Avg Cadence', {}).get('miles_ridden', 0)) for r in averages])
     total_achievements = None
     try:
-        total_achievements = averages[-1].get('total_achievements').get('N')
+        total_achievements = averages[-1].get('total_achievements', 0)
     except Exception:
         total_achievements: "0"
 
@@ -624,25 +624,8 @@ def __delete_keys__(user_id: str):
         app.cache.delete_memoized(get_ride_charts, user_id)
         app.cache.delete_memoized(get_user_count)
         app.cache.delete_memoized(get_total_rides)
-        # app.cache.clear()
-    # """
-    # # This should speed up the caching a bit and let this thing scale a bit easier.
-    # # One day I'll quit being cheap and move off the t2.micro
-    # # :param user_id:  the person to clear out
-    # # :return:
-    # """
-    #
-    # if user_id is None:
-    #     return
-    #
-    # pattern = f"*{user_id}*"
-    # cache.delete_memoized('/get_user_rollup/', user_id)
-    # cache.delete_memoized('/course_data/', user_id)
-    # cache.delete_memoized('/get_user_rollup/', user_id)
-    # cache.delete_memoized('/get_charts/', user_id)
-    # cache.delete_memoized('/get_heart_rate', user_id)
-    # cache.delete_memoized('/get_ride_charts' , user_id)
 
 
 if __name__ == "__main__":
+    # Let it just run on whatever ifconfig thinks it is
     app.run(host='0.0.0.0', debug=True)
